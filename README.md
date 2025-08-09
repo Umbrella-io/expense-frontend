@@ -4,7 +4,7 @@ A modern Next.js 14 frontend application for tracking personal income and expens
 
 ## Features
 
-- 📊 **Dashboard**: Visual overview with pie charts showing expense and income breakdown by category
+- 📊 **Dashboard **: Visual overview with pie charts showing expense and income breakdown by category
 - 💰 **Transaction Management**: Add new income and expense transactions
 - 🏷️ **Category Management**: Create and manage expense and income categories
 - 📱 **Responsive Design**: Mobile-first design that works on all devices
