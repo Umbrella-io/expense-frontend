@@ -18,9 +18,16 @@ export default function Dashboard() {
     const fetchData = async () => {
       try {
         const aggregate = await getTransactionAggregate();
+        console.log('Fetched aggregate:', aggregate);
+        // Defensive: ensure categories is an object
+        if (!aggregate || typeof aggregate.categories !== 'object' || aggregate.categories === null) {
+          aggregate.categories = {};
+        }
         setData(aggregate);
         const txs = await getTransactions();
-        setTransactions(txs);
+        console.log('Fetched transactions:', txs);
+        // Defensive: ensure txs is an array
+        setTransactions(Array.isArray(txs) ? txs : []);
       } catch (error) {
         console.error('Error fetching data:', error);
         toast.error('Failed to load dashboard data');
@@ -40,7 +47,7 @@ export default function Dashboard() {
     );
   }
 
-  if (!data || !data.categories) {
+  if (!data || typeof data.categories !== 'object' || data.categories === null) {
     return (
       <div className="text-center py-12">
         <h2 className="text-2xl font-semibold text-gray-900 mb-4">No Data Available</h2>
