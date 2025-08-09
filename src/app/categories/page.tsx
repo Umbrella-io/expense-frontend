@@ -142,7 +142,7 @@ export default function Categories() {
                 >
                   <span className="font-medium text-gray-900">{category.name}</span>
                   <span className="text-sm text-gray-500">
-                    {new Date(category.createdAt).toLocaleDateString()}
+                    {new Date(category.created_at).toLocaleDateString()}
                   </span>
                 </div>
               ))}
@@ -170,7 +170,7 @@ export default function Categories() {
                 >
                   <span className="font-medium text-gray-900">{category.name}</span>
                   <span className="text-sm text-gray-500">
-                    {new Date(category.createdAt).toLocaleDateString()}
+                    {new Date(category.created_at).toLocaleDateString()}
                   </span>
                 </div>
               ))}
