@@ -41,23 +41,23 @@ export async function apiPost<T>(endpoint: string, data: unknown): Promise<T> {
 
 // API functions for specific endpoints
 export async function getTransactions() {
-  return apiGet<Transaction[]>('/api/transactions');
+  return apiGet<Transaction[]>('/transactions');
 }
 
 export async function createTransaction(data: CreateTransactionRequest) {
-  return apiPost<Transaction>('/api/transactions', data);
+  return apiPost<Transaction>('/transactions', data);
 }
 
 export async function getTransactionAggregate() {
-  return apiGet<TransactionAggregate>('/api/transactions/aggregate');
+  return apiGet<TransactionAggregate>('/transactions/aggregate');
 }
 
 export async function getCategories() {
-  return apiGet<Category[]>('/api/categories');
+  return apiGet<Category[]>('/categories');
 }
 
 export async function createCategory(data: CreateCategoryRequest) {
-  return apiPost<Category>('/api/categories', data);
+  return apiPost<Category>('/categories', data);
 }
 
 export async function getHealth() {
