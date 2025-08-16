@@ -1,5 +1,6 @@
 export interface Transaction {
   id: number;
+  transaction_id: string;
   amount: number;
   type: 'expense' | 'income';
   category_id: number;
@@ -27,16 +28,55 @@ export interface TransactionAggregate {
 }
 
 export interface CreateTransactionRequest {
+  transaction_id?: string;
   amount: number;
   type: 'expense' | 'income';
   category_id: number;
+  description: string;
+  date?: string;
+}
+
+export interface UpdateTransactionRequest {
+  transaction_id?: string;
+  amount?: number;
+  type?: 'expense' | 'income';
+  category_id?: number;
   description?: string;
-  date: string;
+  date?: string;
+}
+
+export interface BulkTransactionRequest {
+  transactions: CreateTransactionRequest[];
+}
+
+export interface BulkTransactionResponse {
+  success: Transaction[];
+  failed: BulkTransactionError[];
+  total_count: number;
+  success_count: number;
+  failed_count: number;
+}
+
+export interface BulkTransactionError {
+  index: number;
+  transaction: CreateTransactionRequest;
+  error: string;
+}
+
+export interface DateRangeParams {
+  start_date: string;
+  end_date: string;
+  type?: 'expense' | 'income';
 }
 
 export interface CreateCategoryRequest {
   name: string;
   type: 'expense' | 'income';
+}
+
+export interface UpdateCategoryRequest {
+  name?: string;
+  type?: 'expense' | 'income';
 }
 
 export interface HealthData {

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
-import { getTransactionAggregate, getTransactions } from '@/lib/api';
+import { getTransactionAggregate, getTransactions, getTransactionsByDateRange, deleteTransaction } from '@/lib/api';
 import type { TransactionAggregate, Transaction } from '@/lib/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import toast from 'react-hot-toast';
@@ -13,31 +13,76 @@ export default function Dashboard() {
   const [data, setData] = useState<TransactionAggregate | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterType, setFilterType] = useState<'all' | 'expense' | 'income'>('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [isDateFiltering, setIsDateFiltering] = useState(false);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const aggregate = await getTransactionAggregate();
+      console.log('Fetched aggregate:', aggregate);
+      // Defensive: ensure categories is an object
+      if (!aggregate || typeof aggregate.categories !== 'object' || aggregate.categories === null) {
+        aggregate.categories = {};
+      }
+      setData(aggregate);
+
+      let txs: Transaction[];
+      if (isDateFiltering && startDate && endDate) {
+        txs = await getTransactionsByDateRange({
+          start_date: startDate,
+          end_date: endDate,
+          type: filterType === 'all' ? undefined : filterType
+        });
+      } else {
+        txs = await getTransactions(filterType === 'all' ? undefined : filterType);
+      }
+      
+      console.log('Fetched transactions:', txs);
+      // Defensive: ensure txs is an array
+      setTransactions(Array.isArray(txs) ? txs : []);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      toast.error('Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const aggregate = await getTransactionAggregate();
-        console.log('Fetched aggregate:', aggregate);
-        // Defensive: ensure categories is an object
-        if (!aggregate || typeof aggregate.categories !== 'object' || aggregate.categories === null) {
-          aggregate.categories = {};
-        }
-        setData(aggregate);
-        const txs = await getTransactions();
-        console.log('Fetched transactions:', txs);
-        // Defensive: ensure txs is an array
-        setTransactions(Array.isArray(txs) ? txs : []);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        toast.error('Failed to load dashboard data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchData();
-  }, []);
+  }, [filterType, isDateFiltering, startDate, endDate]);
+
+  const handleDeleteTransaction = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this transaction?')) {
+      return;
+    }
+
+    try {
+      await deleteTransaction(id);
+      toast.success('Transaction deleted successfully');
+      fetchData(); // Refresh data
+    } catch (error) {
+      console.error('Error deleting transaction:', error);
+      toast.error('Failed to delete transaction');
+    }
+  };
+
+  const applyDateFilter = () => {
+    if (!startDate || !endDate) {
+      toast.error('Please select both start and end dates');
+      return;
+    }
+    setIsDateFiltering(true);
+  };
+
+  const clearDateFilter = () => {
+    setStartDate('');
+    setEndDate('');
+    setIsDateFiltering(false);
+  };
 
   if (loading) {
     return (
@@ -118,7 +163,59 @@ export default function Dashboard() {
 
       {/* Transaction List */}
       <div className="bg-white p-6 rounded-lg shadow-sm border">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Transactions</h3>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 md:mb-0">Transactions</h3>
+          
+          {/* Filters */}
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* Type Filter */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">Type:</label>
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value as 'all' | 'expense' | 'income')}
+                className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">All</option>
+                <option value="expense">Expense</option>
+                <option value="income">Income</option>
+              </select>
+            </div>
+
+            {/* Date Range Filter */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">From:</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <label className="text-sm font-medium text-gray-700">To:</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={applyDateFilter}
+                disabled={!startDate || !endDate}
+                className="px-3 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Apply
+              </button>
+              {isDateFiltering && (
+                <button
+                  onClick={clearDateFilter}
+                  className="px-3 py-1 bg-gray-600 text-white rounded-md text-sm hover:bg-gray-700"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
         {transactions.length === 0 ? (
           <div className="text-gray-500">No transactions found.</div>
         ) : (
@@ -126,21 +223,33 @@ export default function Dashboard() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead>
                 <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Transaction ID</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                   <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                  <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">
                 {transactions.map(tx => (
                   <tr key={tx.id}>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-600 font-mono">{tx.transaction_id || '-'}</td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">{new Date(tx.date).toLocaleDateString()}</td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">{tx.description || '-'}</td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">{tx.category?.name || '-'}</td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 capitalize">{tx.type}</td>
                     <td className={`px-4 py-2 whitespace-nowrap text-sm text-right font-semibold ${tx.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(tx.amount)}</td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-center">
+                      <button
+                        onClick={() => handleDeleteTransaction(tx.id)}
+                        className="text-red-600 hover:text-red-800 font-medium"
+                        title="Delete transaction"
+                      >
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
