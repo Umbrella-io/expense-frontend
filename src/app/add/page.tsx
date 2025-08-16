@@ -50,11 +50,12 @@ export default function AddTransaction() {
     try {
       // Build payload with exact backend format
       const payload = {
+        transaction_id: data.transaction_id || undefined,
         amount: Number(data.amount),
         type: data.type,
         category_id: Number(data.category_id),
         description: data.description,
-        date: new Date(data.date).toISOString(), // ensures format: YYYY-MM-DDTHH:mm:ssZ
+        date: data.date ? new Date(data.date).toISOString() : new Date().toISOString(), // ensures format: YYYY-MM-DDTHH:mm:ssZ
       };
       await createTransaction(payload);
       toast.success('Transaction added successfully!');
@@ -86,6 +87,21 @@ export default function AddTransaction() {
 
       <div className="bg-white p-6 rounded-lg shadow-sm border">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {/* Transaction ID */}
+          <div>
+            <label htmlFor="transaction_id" className="block text-sm font-medium text-gray-700 mb-2">
+              Transaction ID
+            </label>
+            <input
+              type="text"
+              id="transaction_id"
+              {...register('transaction_id')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+              placeholder="Optional custom transaction ID"
+            />
+            <p className="mt-1 text-sm text-gray-500">Leave empty to auto-generate</p>
+          </div>
+
           {/* Amount */}
           <div>
             <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-2">

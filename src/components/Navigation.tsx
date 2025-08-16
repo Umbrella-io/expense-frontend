@@ -48,6 +48,16 @@ export default function Navigation() {
               Categories
             </Link>
             <Link
+              href="/bulk"
+              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                isActive('/bulk')
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+              }`}
+            >
+              Bulk Upload
+            </Link>
+            <Link
               href="/health"
               className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                 isActive('/health')
