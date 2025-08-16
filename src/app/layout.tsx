@@ -25,7 +25,18 @@ export default function RootLayout({
             {children}
           </main>
         </div>
-        <Toaster position="top-right" />
+        <Toaster 
+          position="top-right" 
+          toastOptions={{
+            style: {
+              position: 'fixed',
+            },
+          }}
+          containerStyle={{
+            position: 'fixed',
+            zIndex: 9999,
+          }}
+        />
       </body>
     </html>
   );
