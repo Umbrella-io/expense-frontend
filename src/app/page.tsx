@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
-import { getTransactionAggregate, getTransactions, getTransactionsByDateRange, deleteTransaction } from '@/lib/api';
-import type { TransactionAggregate, Transaction } from '@/lib/types';
+import { getTransactionAggregate, getTransactions, getTransactionsByDateRange, deleteTransaction, updateTransactionCategory, getCategories } from '@/lib/api';
+import type { TransactionAggregate, Transaction, Category } from '@/lib/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import toast from 'react-hot-toast';
 
@@ -12,7 +12,9 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'
 export default function Dashboard() {
   const [data, setData] = useState<TransactionAggregate | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [updatingCategory, setUpdatingCategory] = useState<number | null>(null);
   const [filterType, setFilterType] = useState<'all' | 'expense' | 'income'>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -21,13 +23,18 @@ export default function Dashboard() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const aggregate = await getTransactionAggregate();
+      const [aggregate, categoriesData] = await Promise.all([
+        getTransactionAggregate(),
+        getCategories()
+      ]);
+      
       console.log('Fetched aggregate:', aggregate);
       // Defensive: ensure categories is an object
       if (!aggregate || typeof aggregate.categories !== 'object' || aggregate.categories === null) {
         aggregate.categories = {};
       }
       setData(aggregate);
+      setCategories(categoriesData);
 
       let txs: Transaction[];
       if (isDateFiltering && startDate && endDate) {
@@ -67,6 +74,53 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Error deleting transaction:', error);
       toast.error('Failed to delete transaction');
+    }
+  };
+
+  const handleCategoryChange = async (transactionId: number, newCategoryId: number, transactionType: 'expense' | 'income') => {
+    // Validate that the category type matches the transaction type
+    const selectedCategory = categories.find(cat => cat.id === newCategoryId);
+    if (!selectedCategory) {
+      toast.error('Invalid category selected');
+      return;
+    }
+
+    if (selectedCategory.type !== transactionType) {
+      toast.error(`Cannot assign ${selectedCategory.type} category to ${transactionType} transaction`);
+      return;
+    }
+
+    // Preserve scroll position
+    const scrollPosition = window.scrollY;
+
+    setUpdatingCategory(transactionId);
+    try {
+      await updateTransactionCategory(transactionId, newCategoryId);
+      
+      // Update the transaction in the local state instead of refetching all data
+      setTransactions(prevTransactions => 
+        prevTransactions.map(tx => 
+          tx.id === transactionId 
+            ? { ...tx, category_id: newCategoryId, category: selectedCategory }
+            : tx
+        )
+      );
+      
+      // Restore scroll position after state update
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollPosition);
+      });
+      
+      toast.success('Category updated successfully');
+    } catch (error) {
+      console.error('Error updating category:', error);
+      toast.error('Failed to update category');
+      // Restore scroll position even on error
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollPosition);
+      });
+    } finally {
+      setUpdatingCategory(null);
     }
   };
 
@@ -238,7 +292,27 @@ export default function Dashboard() {
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-600 font-mono">{tx.transaction_id || '-'}</td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">{new Date(tx.date).toLocaleDateString()}</td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">{tx.description || '-'}</td>
-                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">{tx.category?.name || '-'}</td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
+                      <select
+                        value={tx.category_id}
+                        onChange={(e) => handleCategoryChange(tx.id, Number(e.target.value), tx.type)}
+                        disabled={updatingCategory === tx.id}
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {categories
+                          .filter(cat => cat.type === tx.type)
+                          .map(category => (
+                            <option key={category.id} value={category.id}>
+                              {category.name}
+                            </option>
+                          ))}
+                      </select>
+                      {updatingCategory === tx.id && (
+                        <div className="flex items-center justify-center mt-1">
+                          <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                      )}
+                    </td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 capitalize">{tx.type}</td>
                     <td className={`px-4 py-2 whitespace-nowrap text-sm text-right font-semibold ${tx.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(tx.amount)}</td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-center">
