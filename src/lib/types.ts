@@ -79,6 +79,18 @@ export interface UpdateCategoryRequest {
   type?: 'expense' | 'income';
 }
 
+export interface BulkDeleteRequest {
+  transaction_ids: number[];
+}
+
+export interface BulkDeleteResponse {
+  deleted: number[];
+  failed: number[] | null;
+  total_count: number;
+  deleted_count: number;
+  failed_count: number;
+}
+
 export interface HealthData {
   status?: string;
   timestamp?: string;

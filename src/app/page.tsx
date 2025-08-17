@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
-import { getTransactionAggregate, getTransactions, getTransactionsByDateRange, deleteTransaction, updateTransactionCategory, getCategories } from '@/lib/api';
+import { getTransactionAggregate, getTransactions, getTransactionsByDateRange, deleteTransaction, deleteBulkTransactions, updateTransactionCategory, getCategories } from '@/lib/api';
 import type { TransactionAggregate, Transaction, Category } from '@/lib/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import toast from 'react-hot-toast';
@@ -19,6 +19,8 @@ export default function Dashboard() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isDateFiltering, setIsDateFiltering] = useState(false);
+  const [selectedTransactions, setSelectedTransactions] = useState<Set<number>>(new Set());
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -74,6 +76,58 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Error deleting transaction:', error);
       toast.error('Failed to delete transaction');
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedTransactions.size === 0) {
+      toast.error('Please select transactions to delete');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete ${selectedTransactions.size} transaction(s)?`)) {
+      return;
+    }
+
+    setIsDeletingBulk(true);
+    try {
+      const transactionIds = Array.from(selectedTransactions);
+      const result = await deleteBulkTransactions({ transaction_ids: transactionIds });
+      
+      if (result.deleted_count > 0) {
+        toast.success(`Successfully deleted ${result.deleted_count} transaction(s)`);
+      }
+      
+      if (result.failed_count > 0) {
+        toast.error(`Failed to delete ${result.failed_count} transaction(s)`);
+      }
+      
+      setSelectedTransactions(new Set());
+      fetchData(); // Refresh data
+    } catch (error) {
+      console.error('Error deleting transactions:', error);
+      toast.error('Failed to delete transactions');
+    } finally {
+      setIsDeletingBulk(false);
+    }
+  };
+
+  const handleSelectTransaction = (id: number, checked: boolean) => {
+    const newSelected = new Set(selectedTransactions);
+    if (checked) {
+      newSelected.add(id);
+    } else {
+      newSelected.delete(id);
+    }
+    setSelectedTransactions(newSelected);
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allIds = new Set(transactions.map(tx => tx.id));
+      setSelectedTransactions(allIds);
+    } else {
+      setSelectedTransactions(new Set());
     }
   };
 
@@ -218,7 +272,21 @@ export default function Dashboard() {
       {/* Transaction List */}
       <div className="bg-white p-6 rounded-lg shadow-sm border">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 md:mb-0">Transactions</h3>
+          <div className="flex items-center gap-4 mb-4 md:mb-0">
+            <h3 className="text-lg font-semibold text-gray-900">Transactions</h3>
+            {selectedTransactions.size > 0 && (
+              <button
+                onClick={handleBulkDelete}
+                disabled={isDeletingBulk}
+                className="px-4 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isDeletingBulk ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : null}
+                Delete Selected ({selectedTransactions.size})
+              </button>
+            )}
+          </div>
           
           {/* Filters */}
           <div className="flex flex-col md:flex-row gap-4">
@@ -277,6 +345,14 @@ export default function Dashboard() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead>
                 <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    <input
+                      type="checkbox"
+                      checked={transactions.length > 0 && selectedTransactions.size === transactions.length}
+                      onChange={(e) => handleSelectAll(e.target.checked)}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                  </th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Transaction ID</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
@@ -288,7 +364,15 @@ export default function Dashboard() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">
                 {transactions.map(tx => (
-                  <tr key={tx.id}>
+                  <tr key={tx.id} className={selectedTransactions.has(tx.id) ? 'bg-blue-50' : ''}>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-600">
+                      <input
+                        type="checkbox"
+                        checked={selectedTransactions.has(tx.id)}
+                        onChange={(e) => handleSelectTransaction(tx.id, e.target.checked)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                    </td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-600 font-mono">{tx.transaction_id || '-'}</td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">{new Date(tx.date).toLocaleDateString()}</td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">{tx.description || '-'}</td>

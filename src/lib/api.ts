@@ -1,4 +1,4 @@
-import type { Transaction, Category, TransactionAggregate, CreateTransactionRequest, CreateCategoryRequest, UpdateTransactionRequest, UpdateCategoryRequest, BulkTransactionRequest, BulkTransactionResponse, DateRangeParams, HealthData } from './types';
+import type { Transaction, Category, TransactionAggregate, CreateTransactionRequest, CreateCategoryRequest, UpdateTransactionRequest, UpdateCategoryRequest, BulkTransactionRequest, BulkTransactionResponse, BulkDeleteRequest, BulkDeleteResponse, DateRangeParams, HealthData } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -72,13 +72,19 @@ export async function apiPatch<T>(endpoint: string, data: unknown): Promise<T> {
   return response.json();
 }
 
-export async function apiDelete<T>(endpoint: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+export async function apiDelete<T>(endpoint: string, data?: unknown): Promise<T> {
+  const requestOptions: RequestInit = {
     method: 'DELETE',
     headers: {
       'Content-Type': 'application/json',
     },
-  });
+  };
+
+  if (data) {
+    requestOptions.body = JSON.stringify(data);
+  }
+
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, requestOptions);
 
   if (!response.ok) {
     throw new Error(`API request failed: ${response.status} ${response.statusText}`);
@@ -115,6 +121,10 @@ export async function deleteTransaction(id: number) {
 
 export async function createBulkTransactions(data: BulkTransactionRequest) {
   return apiPost<BulkTransactionResponse>('/api/transactions/bulk', data);
+}
+
+export async function deleteBulkTransactions(data: BulkDeleteRequest) {
+  return apiDelete<BulkDeleteResponse>('/api/transactions/bulk', data);
 }
 
 export async function getTransactionsByDateRange(params: DateRangeParams) {
