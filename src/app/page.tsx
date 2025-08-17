@@ -22,6 +22,8 @@ export default function Dashboard() {
   const [selectedTransactions, setSelectedTransactions] = useState<Set<number>>(new Set());
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
   const [aggregateTableData, setAggregateTableData] = useState<AggregateTableResponse | null>(null);
+  const [aggregateTableStartDate, setAggregateTableStartDate] = useState('');
+  const [aggregateTableEndDate, setAggregateTableEndDate] = useState('');
 
   const fetchData = async () => {
     setLoading(true);
@@ -38,19 +40,6 @@ export default function Dashboard() {
       }
       setData(aggregate);
       setCategories(categoriesData);
-
-      // Fetch aggregate table data if date filtering is active
-      if (isDateFiltering && startDate && endDate) {
-        try {
-          const aggregateTable = await getTransactionAggregateTable(startDate, endDate);
-          setAggregateTableData(aggregateTable);
-        } catch (error) {
-          console.error('Error fetching aggregate table:', error);
-          setAggregateTableData(null);
-        }
-      } else {
-        setAggregateTableData(null);
-      }
 
       let txs: Transaction[];
       if (isDateFiltering && startDate && endDate) {
@@ -74,9 +63,39 @@ export default function Dashboard() {
     }
   };
 
+  const fetchAggregateTable = async () => {
+    if (aggregateTableStartDate && aggregateTableEndDate) {
+      try {
+        const aggregateTable = await getTransactionAggregateTable(aggregateTableStartDate, aggregateTableEndDate);
+        setAggregateTableData(aggregateTable);
+      } catch (error) {
+        console.error('Error fetching aggregate table:', error);
+        setAggregateTableData(null);
+      }
+    }
+  };
+
+  // Initialize aggregate table date range to current month
+  useEffect(() => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const currentDate = new Date();
+    
+    const formatDate = (date: Date) => {
+      return date.toISOString().split('T')[0];
+    };
+    
+    setAggregateTableStartDate(formatDate(startOfMonth));
+    setAggregateTableEndDate(formatDate(currentDate));
+  }, []);
+
   useEffect(() => {
     fetchData();
   }, [filterType, isDateFiltering, startDate, endDate]);
+
+  useEffect(() => {
+    fetchAggregateTable();
+  }, [aggregateTableStartDate, aggregateTableEndDate]);
 
   const handleDeleteTransaction = async (id: number) => {
     if (!confirm('Are you sure you want to delete this transaction?')) {
@@ -286,10 +305,28 @@ export default function Dashboard() {
       {/* Aggregate Table */}
       {aggregateTableData && (
         <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Category Breakdown</h3>
-            <div className="text-sm text-gray-600">
-              {new Date(aggregateTableData.date_range.start_date).toLocaleDateString()} - {new Date(aggregateTableData.date_range.end_date).toLocaleDateString()}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 md:mb-0">Category Breakdown</h3>
+            <div className="flex flex-col md:flex-row md:items-center gap-4">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700">From:</label>
+                <input
+                  type="date"
+                  value={aggregateTableStartDate}
+                  onChange={(e) => setAggregateTableStartDate(e.target.value)}
+                  className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <label className="text-sm font-medium text-gray-700">To:</label>
+                <input
+                  type="date"
+                  value={aggregateTableEndDate}
+                  onChange={(e) => setAggregateTableEndDate(e.target.value)}
+                  className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="text-sm text-gray-600">
+                {new Date(aggregateTableData.date_range.start_date).toLocaleDateString()} - {new Date(aggregateTableData.date_range.end_date).toLocaleDateString()}
+              </div>
             </div>
           </div>
 
