@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
-import { getTransactionAggregate, getTransactions, getTransactionsByDateRange, deleteTransaction, deleteBulkTransactions, updateTransactionCategory, getCategories } from '@/lib/api';
-import type { TransactionAggregate, Transaction, Category } from '@/lib/types';
+import { getTransactionAggregate, getTransactionAggregateTable, getTransactions, getTransactionsByDateRange, deleteTransaction, deleteBulkTransactions, updateTransactionCategory, getCategories } from '@/lib/api';
+import type { TransactionAggregate, AggregateTableResponse, Transaction, Category } from '@/lib/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import toast from 'react-hot-toast';
 
@@ -21,6 +21,9 @@ export default function Dashboard() {
   const [isDateFiltering, setIsDateFiltering] = useState(false);
   const [selectedTransactions, setSelectedTransactions] = useState<Set<number>>(new Set());
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
+  const [aggregateTableData, setAggregateTableData] = useState<AggregateTableResponse | null>(null);
+  const [aggregateTableStartDate, setAggregateTableStartDate] = useState('');
+  const [aggregateTableEndDate, setAggregateTableEndDate] = useState('');
 
   const fetchData = async () => {
     setLoading(true);
@@ -60,9 +63,39 @@ export default function Dashboard() {
     }
   };
 
+  const fetchAggregateTable = async () => {
+    if (aggregateTableStartDate && aggregateTableEndDate) {
+      try {
+        const aggregateTable = await getTransactionAggregateTable(aggregateTableStartDate, aggregateTableEndDate);
+        setAggregateTableData(aggregateTable);
+      } catch (error) {
+        console.error('Error fetching aggregate table:', error);
+        setAggregateTableData(null);
+      }
+    }
+  };
+
+  // Initialize aggregate table date range to current month
+  useEffect(() => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const currentDate = new Date();
+    
+    const formatDate = (date: Date) => {
+      return date.toISOString().split('T')[0];
+    };
+    
+    setAggregateTableStartDate(formatDate(startOfMonth));
+    setAggregateTableEndDate(formatDate(currentDate));
+  }, []);
+
   useEffect(() => {
     fetchData();
   }, [filterType, isDateFiltering, startDate, endDate]);
+
+  useEffect(() => {
+    fetchAggregateTable();
+  }, [aggregateTableStartDate, aggregateTableEndDate]);
 
   const handleDeleteTransaction = async (id: number) => {
     if (!confirm('Are you sure you want to delete this transaction?')) {
@@ -268,6 +301,146 @@ export default function Dashboard() {
           </PieChart>
         </ResponsiveContainer>
       </div>
+
+      {/* Aggregate Table */}
+      {aggregateTableData && (
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 md:mb-0">Category Breakdown</h3>
+            <div className="flex flex-col md:flex-row md:items-center gap-4">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700">From:</label>
+                <input
+                  type="date"
+                  value={aggregateTableStartDate}
+                  onChange={(e) => setAggregateTableStartDate(e.target.value)}
+                  className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <label className="text-sm font-medium text-gray-700">To:</label>
+                <input
+                  type="date"
+                  value={aggregateTableEndDate}
+                  onChange={(e) => setAggregateTableEndDate(e.target.value)}
+                  className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="text-sm text-gray-600">
+                {new Date(aggregateTableData.date_range.start_date).toLocaleDateString()} - {new Date(aggregateTableData.date_range.end_date).toLocaleDateString()}
+              </div>
+            </div>
+          </div>
+
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+              <h4 className="text-sm font-medium text-green-800 mb-1">Total Income</h4>
+              <p className="text-2xl font-bold text-green-600">{formatCurrency(aggregateTableData.summary.total_income)}</p>
+              <p className="text-sm text-green-700">{aggregateTableData.income.total_transactions} transactions</p>
+            </div>
+            <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+              <h4 className="text-sm font-medium text-red-800 mb-1">Total Expenses</h4>
+              <p className="text-2xl font-bold text-red-600">{formatCurrency(aggregateTableData.summary.total_expenses)}</p>
+              <p className="text-sm text-red-700">{aggregateTableData.expenses.total_transactions} transactions</p>
+            </div>
+            <div className={`p-4 rounded-lg border ${
+              aggregateTableData.summary.net_amount >= 0 
+                ? 'bg-blue-50 border-blue-200' 
+                : 'bg-orange-50 border-orange-200'
+            }`}>
+              <h4 className={`text-sm font-medium mb-1 ${
+                aggregateTableData.summary.net_amount >= 0 
+                  ? 'text-blue-800' 
+                  : 'text-orange-800'
+              }`}>Net Amount</h4>
+              <p className={`text-2xl font-bold ${
+                aggregateTableData.summary.net_amount >= 0 
+                  ? 'text-blue-600' 
+                  : 'text-orange-600'
+              }`}>{formatCurrency(aggregateTableData.summary.net_amount)}</p>
+              <p className={`text-sm ${
+                aggregateTableData.summary.net_amount >= 0 
+                  ? 'text-blue-700' 
+                  : 'text-orange-700'
+              }`}>{aggregateTableData.summary.net_amount >= 0 ? 'Surplus' : 'Deficit'}</p>
+            </div>
+          </div>
+
+          {/* Category Tables */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Income Categories */}
+            <div>
+              <h4 className="text-md font-semibold text-gray-900 mb-3 flex items-center">
+                <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                Income Categories
+              </h4>
+              {aggregateTableData.income.categories.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Count</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-100">
+                      {aggregateTableData.income.categories.map(category => (
+                        <tr key={category.category_id}>
+                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{category.category_name}</td>
+                          <td className="px-4 py-2 whitespace-nowrap text-sm text-right font-semibold text-green-600">
+                            {formatCurrency(category.total_amount)}
+                          </td>
+                          <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-gray-600">
+                            {category.transaction_count}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-gray-500 text-sm py-4">No income transactions in this period</div>
+              )}
+            </div>
+
+            {/* Expense Categories */}
+            <div>
+              <h4 className="text-md font-semibold text-gray-900 mb-3 flex items-center">
+                <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+                Expense Categories
+              </h4>
+              {aggregateTableData.expenses.categories.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Count</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-100">
+                      {aggregateTableData.expenses.categories.map(category => (
+                        <tr key={category.category_id}>
+                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{category.category_name}</td>
+                          <td className="px-4 py-2 whitespace-nowrap text-sm text-right font-semibold text-red-600">
+                            {formatCurrency(category.total_amount)}
+                          </td>
+                          <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-gray-600">
+                            {category.transaction_count}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-gray-500 text-sm py-4">No expense transactions in this period</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Transaction List */}
       <div className="bg-white p-6 rounded-lg shadow-sm border">

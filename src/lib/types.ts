@@ -91,6 +91,35 @@ export interface BulkDeleteResponse {
   failed_count: number;
 }
 
+export interface AggregateTableCategoryData {
+  category_id: number;
+  category_name: string;
+  total_amount: number;
+  transaction_count: number;
+}
+
+export interface AggregateTableResponse {
+  date_range: {
+    start_date: string;
+    end_date: string;
+  };
+  income: {
+    categories: AggregateTableCategoryData[];
+    total_amount: number;
+    total_transactions: number;
+  };
+  expenses: {
+    categories: AggregateTableCategoryData[];
+    total_amount: number;
+    total_transactions: number;
+  };
+  summary: {
+    net_amount: number;
+    total_income: number;
+    total_expenses: number;
+  };
+}
+
 export interface HealthData {
   status?: string;
   timestamp?: string;
