@@ -1,4 +1,4 @@
-import type { Transaction, Category, TransactionAggregate, CreateTransactionRequest, CreateCategoryRequest, UpdateTransactionRequest, UpdateCategoryRequest, BulkTransactionRequest, BulkTransactionResponse, BulkDeleteRequest, BulkDeleteResponse, DateRangeParams, HealthData } from './types';
+import type { Transaction, Category, TransactionAggregate, CreateTransactionRequest, CreateCategoryRequest, UpdateTransactionRequest, UpdateCategoryRequest, BulkTransactionRequest, BulkTransactionResponse, BulkDeleteRequest, BulkDeleteResponse, AggregateTableResponse, DateRangeParams, HealthData } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -138,6 +138,14 @@ export async function getTransactionsByDateRange(params: DateRangeParams) {
 
 export async function getTransactionAggregate() {
   return apiGet<TransactionAggregate>('/api/transactions/aggregate');
+}
+
+export async function getTransactionAggregateTable(startDate: string, endDate: string) {
+  const queryParams = new URLSearchParams({
+    start_date: startDate,
+    end_date: endDate
+  });
+  return apiGet<AggregateTableResponse>(`/api/transactions/aggregate-table?${queryParams}`);
 }
 
 export async function getCategories() {
