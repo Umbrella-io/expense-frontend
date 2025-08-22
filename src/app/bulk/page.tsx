@@ -143,7 +143,7 @@ export default function BulkTransactions() {
                     <input
                       type="text"
                       {...register(`transactions.${index}.transaction_id`)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-gray-900"
                       placeholder="Optional"
                     />
                   </div>
@@ -161,7 +161,7 @@ export default function BulkTransactions() {
                         required: 'Amount is required',
                         min: { value: 0.01, message: 'Amount must be greater than 0' }
                       })}
-                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 ${
                         errors.transactions?.[index]?.amount ? 'border-red-500' : 'border-gray-300'
                       }`}
                       placeholder="0.00"
@@ -178,7 +178,7 @@ export default function BulkTransactions() {
                     </label>
                     <select
                       {...register(`transactions.${index}.type`, { required: 'Type is required' })}
-                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 ${
                         errors.transactions?.[index]?.type ? 'border-red-500' : 'border-gray-300'
                       }`}
                     >
@@ -194,7 +194,7 @@ export default function BulkTransactions() {
                     </label>
                     <select
                       {...register(`transactions.${index}.category_id`, { required: 'Category is required' })}
-                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 ${
                         errors.transactions?.[index]?.category_id ? 'border-red-500' : 'border-gray-300'
                       }`}
                     >
@@ -218,7 +218,7 @@ export default function BulkTransactions() {
                     <input
                       type="text"
                       {...register(`transactions.${index}.description`, { required: 'Description is required' })}
-                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 ${
                         errors.transactions?.[index]?.description ? 'border-red-500' : 'border-gray-300'
                       }`}
                       placeholder="Transaction description"
@@ -236,7 +236,7 @@ export default function BulkTransactions() {
                     <input
                       type="date"
                       {...register(`transactions.${index}.date`)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                     />
                   </div>
                 </div>

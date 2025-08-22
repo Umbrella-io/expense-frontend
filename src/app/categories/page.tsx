@@ -83,7 +83,7 @@ export default function Categories() {
                 required: 'Category name is required',
                 minLength: { value: 2, message: 'Name must be at least 2 characters' }
               })}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 ${
                 errors.name ? 'border-red-500' : 'border-gray-300'
               }`}
               placeholder="e.g., Groceries"
@@ -100,7 +100,7 @@ export default function Categories() {
             <select
               id="type"
               {...register('type', { required: 'Type is required' })}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 ${
                 errors.type ? 'border-red-500' : 'border-gray-300'
               }`}
             >

@@ -96,7 +96,7 @@ export default function AddTransaction() {
               type="text"
               id="transaction_id"
               {...register('transaction_id')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-gray-900"
               placeholder="Optional custom transaction ID"
             />
             <p className="mt-1 text-sm text-gray-500">Leave empty to auto-generate</p>
@@ -116,7 +116,7 @@ export default function AddTransaction() {
                 required: 'Amount is required',
                 min: { value: 0.01, message: 'Amount must be greater than 0' }
               })}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 ${
                 errors.amount ? 'border-red-500' : 'border-gray-300'
               }`}
               placeholder="0.00"
@@ -134,7 +134,7 @@ export default function AddTransaction() {
             <select
               id="type"
               {...register('type', { required: 'Type is required' })}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 ${
                 errors.type ? 'border-red-500' : 'border-gray-300'
               }`}
             >
@@ -155,7 +155,7 @@ export default function AddTransaction() {
             <select
               id="category_id"
               {...register('category_id', { required: 'Category is required' })}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 ${
                 errors.category_id ? 'border-red-500' : 'border-gray-300'
               }`}
               disabled={!watchType}
@@ -184,7 +184,7 @@ export default function AddTransaction() {
               type="text"
               id="description"
               {...register('description')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               placeholder="Optional description"
             />
           </div>
@@ -198,7 +198,7 @@ export default function AddTransaction() {
               type="date"
               id="date"
               {...register('date', { required: 'Date is required' })}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 ${
                 errors.date ? 'border-red-500' : 'border-gray-300'
               }`}
             />
