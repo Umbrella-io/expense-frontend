@@ -242,7 +242,7 @@ export default function Dashboard() {
     );
   }
 
-  const chartData = Object.entries(data.categories).map(([name, value]) => ({
+  const chartData = Object.entries(data.categories || {}).map(([name, value]) => ({
     name,
     value,
   }));
@@ -280,26 +280,35 @@ export default function Dashboard() {
       {/* Category Breakdown Chart */}
       <div className="bg-white p-4 md:p-6 rounded-lg shadow-sm border">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Breakdown by Category</h3>
-        <ResponsiveContainer width="100%" height={250}>
-          <PieChart>
-            <Pie
-              data={chartData}
-              dataKey="value"
-              nameKey="name"
-              cx="50%"
-              cy="50%"
-              outerRadius={80}
-              fill="#8884d8"
-              label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
-            >
-              {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip formatter={(value) => formatCurrency(value as number)} />
-            <Legend />
-          </PieChart>
-        </ResponsiveContainer>
+        {chartData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={250}>
+            <PieChart>
+              <Pie
+                data={chartData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                outerRadius={80}
+                fill="#8884d8"
+                label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+              >
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(value) => formatCurrency(value as number)} />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="flex items-center justify-center h-[250px] text-gray-500">
+            <div className="text-center">
+              <p className="text-lg mb-2">No category data available</p>
+              <p className="text-sm">Add some transactions to see the breakdown</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Aggregate Table */}
@@ -377,7 +386,7 @@ export default function Dashboard() {
                 <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
                 Income Categories
               </h4>
-              {aggregateTableData.income.categories.length > 0 ? (
+              {aggregateTableData.income.categories && aggregateTableData.income.categories.length > 0 ? (
                 <div className="space-y-2">
                   {/* Mobile Card View */}
                   <div className="block sm:hidden space-y-2">
@@ -428,7 +437,7 @@ export default function Dashboard() {
                 <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
                 Expense Categories
               </h4>
-              {aggregateTableData.expenses.categories.length > 0 ? (
+              {aggregateTableData.expenses.categories && aggregateTableData.expenses.categories.length > 0 ? (
                 <div className="space-y-2">
                   {/* Mobile Card View */}
                   <div className="block sm:hidden space-y-2">
@@ -603,7 +612,7 @@ export default function Dashboard() {
                   <div className="flex items-center gap-2">
                     <label className="text-sm text-gray-600">Category:</label>
                     <select
-                      value={tx.category_id}
+                      value={tx.category_id || ''}
                       onChange={(e) => handleCategoryChange(tx.id, Number(e.target.value), tx.type)}
                       disabled={updatingCategory === tx.id}
                       className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
@@ -662,7 +671,7 @@ export default function Dashboard() {
                       <td className="px-3 py-2 text-sm text-gray-700 max-w-xs truncate">{tx.description || '-'}</td>
                       <td className="px-3 py-2 text-sm text-gray-700">
                         <select
-                          value={tx.category_id}
+                          value={tx.category_id || ''}
                           onChange={(e) => handleCategoryChange(tx.id, Number(e.target.value), tx.type)}
                           disabled={updatingCategory === tx.id}
                           className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
