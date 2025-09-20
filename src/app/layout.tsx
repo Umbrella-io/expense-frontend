@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
-import Navigation from "@/components/Navigation";
+import { AuthProvider } from "@/contexts/AuthContext";
+import AuthWrapper from "@/components/AuthWrapper";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -19,24 +20,23 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <div className="min-h-screen bg-gray-50">
-          <Navigation />
-          <main className="container mx-auto px-4 py-8">
+        <AuthProvider>
+          <AuthWrapper>
             {children}
-          </main>
-        </div>
-        <Toaster 
-          position="top-right" 
-          toastOptions={{
-            style: {
+          </AuthWrapper>
+          <Toaster 
+            position="top-right" 
+            toastOptions={{
+              style: {
+                position: 'fixed',
+              },
+            }}
+            containerStyle={{
               position: 'fixed',
-            },
-          }}
-          containerStyle={{
-            position: 'fixed',
-            zIndex: 9999,
-          }}
-        />
+              zIndex: 9999,
+            }}
+          />
+        </AuthProvider>
       </body>
     </html>
   );
