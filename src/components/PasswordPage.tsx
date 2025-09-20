@@ -10,7 +10,9 @@ const PasswordPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const { login } = useAuth();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (
+    e: React.FormEvent<HTMLFormElement> | React.KeyboardEvent<HTMLInputElement>
+  ) => {
     e.preventDefault();
     
     if (!password.trim()) {
@@ -35,9 +37,10 @@ const PasswordPage: React.FC = () => {
     setIsLoading(false);
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      handleSubmit(e as any);
+      e.preventDefault();
+      void handleSubmit(e);
     }
   };
 
@@ -84,7 +87,7 @@ const PasswordPage: React.FC = () => {
                 placeholder="Enter password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onKeyDown={handleKeyDown}
                 disabled={isLoading}
               />
               {/* Eye toggle */}
