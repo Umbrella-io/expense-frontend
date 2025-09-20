@@ -3,10 +3,12 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Navigation() {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { logout } = useAuth();
 
   const isActive = (path: string) => pathname === path;
 
@@ -31,7 +33,7 @@ export default function Navigation() {
           </Link>
           
           {/* Desktop Navigation */}
-          <div className="hidden md:flex space-x-8">
+          <div className="hidden md:flex items-center space-x-8">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
@@ -45,6 +47,12 @@ export default function Navigation() {
                 {link.label}
               </Link>
             ))}
+            <button
+              onClick={logout}
+              className="px-3 py-2 rounded-md text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors"
+            >
+              Logout
+            </button>
           </div>
 
           {/* Mobile menu button */}
@@ -87,6 +95,13 @@ export default function Navigation() {
                   {link.label}
                 </Link>
               ))}
+              <div className="border-t border-gray-200 my-2" />
+              <button
+                onClick={() => { logout(); closeMenu(); }}
+                className="w-full text-left block px-3 py-2 rounded-md text-base font-medium text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors"
+              >
+                Logout
+              </button>
             </div>
           </div>
         )}
