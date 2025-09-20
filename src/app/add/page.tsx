@@ -48,14 +48,21 @@ export default function AddTransaction() {
   const onSubmit = async (data: CreateTransactionRequest) => {
     setLoading(true);
     try {
+      // Check if trying to create investment transaction
+      if (data.type === 'investment') {
+        toast.error('Investment transactions are not yet supported by the backend. Please update the backend API to support investment type.');
+        return;
+      }
+
       // Build payload with exact backend format
       const payload = {
         transaction_id: data.transaction_id || undefined,
         amount: Number(data.amount),
         type: data.type,
         category_id: Number(data.category_id),
+        bank_account_id: Number(data.bank_account_id),
         description: data.description,
-        date: data.date ? new Date(data.date).toISOString() : new Date().toISOString(), // ensures format: YYYY-MM-DDTHH:mm:ssZ
+        date: data.date ? new Date(data.date).toISOString() : new Date().toISOString(),
       };
       await createTransaction(payload);
       toast.success('Transaction added successfully!');
@@ -82,7 +89,7 @@ export default function AddTransaction() {
     <div className="max-w-2xl mx-auto">
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Add Transaction</h1>
-        <p className="text-gray-600">Record your income or expense</p>
+        <p className="text-gray-600">Record your income, expense, or investment</p>
       </div>
 
       <div className="bg-white p-6 rounded-lg shadow-sm border">
@@ -141,6 +148,7 @@ export default function AddTransaction() {
               <option value="">Select type</option>
               <option value="expense">Expense</option>
               <option value="income">Income</option>
+              <option value="investment">Investment</option>
             </select>
             {errors.type && (
               <p className="mt-1 text-sm text-red-600">{errors.type.message}</p>
@@ -172,6 +180,26 @@ export default function AddTransaction() {
             )}
             {!watchType && (
               <p className="mt-1 text-sm text-gray-500">Please select a type first</p>
+            )}
+          </div>
+
+          {/* Bank Account */}
+          <div>
+            <label htmlFor="bank_account_id" className="block text-sm font-medium text-gray-700 mb-2">
+              Bank Account *
+            </label>
+            <select
+              id="bank_account_id"
+              {...register('bank_account_id', { required: 'Bank account is required' })}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 ${
+                errors.bank_account_id ? 'border-red-500' : 'border-gray-300'
+              }`}
+            >
+              <option value="">Select bank account</option>
+              <option value="1">Default Account</option>
+            </select>
+            {errors.bank_account_id && (
+              <p className="mt-1 text-sm text-red-600">{errors.bank_account_id.message}</p>
             )}
           </div>
 

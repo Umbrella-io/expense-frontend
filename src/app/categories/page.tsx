@@ -38,6 +38,12 @@ export default function Categories() {
   const onSubmit = async (data: CreateCategoryRequest) => {
     setLoading(true);
     try {
+      // Check if trying to create investment category
+      if (data.type === 'investment') {
+        toast.error('Investment categories are not yet supported by the backend. Please update the backend API to support investment type.');
+        return;
+      }
+
       await createCategory(data);
       toast.success('Category added successfully!');
       reset();
@@ -52,6 +58,7 @@ export default function Categories() {
 
   const expenseCategories = categories.filter(cat => cat.type === 'expense');
   const incomeCategories = categories.filter(cat => cat.type === 'income');
+  const investmentCategories = categories.filter(cat => cat.type === 'investment');
 
   if (categoriesLoading) {
     return (
@@ -65,7 +72,7 @@ export default function Categories() {
     <div className="max-w-4xl mx-auto">
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Categories</h1>
-        <p className="text-gray-600">Manage your expense and income categories</p>
+        <p className="text-gray-600">Manage your expense, income, and investment categories</p>
       </div>
 
       {/* Add Category Form */}
@@ -107,6 +114,7 @@ export default function Categories() {
               <option value="">Select type</option>
               <option value="expense">Expense</option>
               <option value="income">Income</option>
+              <option value="investment">Investment</option>
             </select>
             {errors.type && (
               <p className="mt-1 text-sm text-red-600">{errors.type.message}</p>
@@ -126,7 +134,7 @@ export default function Categories() {
       </div>
 
       {/* Categories List */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Expense Categories */}
         <div className="bg-white p-6 rounded-lg shadow-sm border">
           <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
@@ -178,6 +186,34 @@ export default function Categories() {
           ) : (
             <div className="text-center py-8 text-gray-500">
               <p>No income categories yet</p>
+              <p className="text-sm">Add some to get started</p>
+            </div>
+          )}
+        </div>
+
+        {/* Investment Categories */}
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+            <span className="w-3 h-3 bg-purple-500 rounded-full mr-2"></span>
+            Investment Categories
+          </h2>
+          {investmentCategories.length > 0 ? (
+            <div className="space-y-2">
+              {investmentCategories.map((category) => (
+                <div
+                  key={category.id}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
+                >
+                  <span className="font-medium text-gray-900">{category.name}</span>
+                  <span className="text-sm text-gray-500">
+                    {new Date(category.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <p>No investment categories yet</p>
               <p className="text-sm">Add some to get started</p>
             </div>
           )}

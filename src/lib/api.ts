@@ -33,7 +33,9 @@ export async function apiPost<T>(endpoint: string, data: unknown): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+    const errorText = await response.text();
+    console.error(`API POST Error - ${response.status}:`, errorText);
+    throw new Error(`API request failed: ${response.status} ${response.statusText}. Details: ${errorText}`);
   }
 
   return response.json();
@@ -50,7 +52,9 @@ export async function apiPut<T>(endpoint: string, data: unknown): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+    const errorText = await response.text();
+    console.error(`API PUT Error - ${response.status}:`, errorText);
+    throw new Error(`API request failed: ${response.status} ${response.statusText}. Details: ${errorText}`);
   }
 
   return response.json();
@@ -66,7 +70,9 @@ export async function apiPatch<T>(endpoint: string, data: unknown): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+    const errorText = await response.text();
+    console.error(`API PATCH Error - ${response.status}:`, errorText);
+    throw new Error(`API request failed: ${response.status} ${response.statusText}. Details: ${errorText}`);
   }
 
   return response.json();
@@ -94,7 +100,7 @@ export async function apiDelete<T>(endpoint: string, data?: unknown): Promise<T>
 }
 
 // API functions for specific endpoints
-export async function getTransactions(type?: 'expense' | 'income') {
+export async function getTransactions(type?: 'expense' | 'income' | 'investment') {
   const queryParam = type ? `?type=${type}` : '';
   return apiGet<Transaction[]>(`/api/transactions${queryParam}`);
 }

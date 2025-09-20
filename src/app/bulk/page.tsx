@@ -59,12 +59,20 @@ export default function BulkTransactions() {
   const onSubmit = async (data: BulkTransactionRequest) => {
     setLoading(true);
     try {
+      // Check for investment transactions
+      const investmentTransactions = data.transactions.filter(tx => tx.type === 'investment');
+      if (investmentTransactions.length > 0) {
+        toast.error(`${investmentTransactions.length} investment transaction(s) detected. Investment transactions are not yet supported by the backend.`);
+        return;
+      }
+
       const payload = {
         transactions: data.transactions.map(tx => ({
           transaction_id: tx.transaction_id || undefined,
           amount: Number(tx.amount),
           type: tx.type,
           category_id: Number(tx.category_id),
+          bank_account_id: Number(tx.bank_account_id),
           description: tx.description,
           date: tx.date ? new Date(tx.date).toISOString() : new Date().toISOString(),
         })),
@@ -93,6 +101,7 @@ export default function BulkTransactions() {
       amount: 0,
       type: 'expense',
       category_id: 0,
+      bank_account_id: 1,
       description: '',
       date: new Date().toISOString().split('T')[0],
     });
@@ -110,7 +119,7 @@ export default function BulkTransactions() {
     <div className="max-w-6xl mx-auto">
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Bulk Add Transactions</h1>
-        <p className="text-gray-600">Add multiple transactions at once</p>
+        <p className="text-gray-600">Add multiple income, expense, or investment transactions at once</p>
       </div>
 
       <div className="bg-white p-6 rounded-lg shadow-sm border">
@@ -184,6 +193,7 @@ export default function BulkTransactions() {
                     >
                       <option value="expense">Expense</option>
                       <option value="income">Income</option>
+                      <option value="investment">Investment</option>
                     </select>
                   </div>
 
@@ -207,6 +217,25 @@ export default function BulkTransactions() {
                     </select>
                     {errors.transactions?.[index]?.category_id && (
                       <p className="mt-1 text-sm text-red-600">{errors.transactions[index]?.category_id?.message}</p>
+                    )}
+                  </div>
+
+                  {/* Bank Account */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Bank Account *
+                    </label>
+                    <select
+                      {...register(`transactions.${index}.bank_account_id`, { required: 'Bank account is required' })}
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 ${
+                        errors.transactions?.[index]?.bank_account_id ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    >
+                      <option value="">Select bank account</option>
+                      <option value="1">Default Account</option>
+                    </select>
+                    {errors.transactions?.[index]?.bank_account_id && (
+                      <p className="mt-1 text-sm text-red-600">{errors.transactions[index]?.bank_account_id?.message}</p>
                     )}
                   </div>
 

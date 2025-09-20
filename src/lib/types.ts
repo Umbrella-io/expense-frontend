@@ -2,7 +2,7 @@ export interface Transaction {
   id: number;
   transaction_id: string;
   amount: number;
-  type: 'expense' | 'income';
+  type: 'expense' | 'income' | 'investment';
   category_id: number;
   category: Category;
   description?: string;
@@ -14,7 +14,7 @@ export interface Transaction {
 export interface Category {
   id: number;
   name: string;
-  type: 'expense' | 'income';
+  type: 'expense' | 'income' | 'investment';
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
@@ -24,14 +24,16 @@ export interface TransactionAggregate {
   categories: Record<string, number>;
   total_income: number;
   total_expenses: number;
+  total_investments: number;
   net_amount: number;
 }
 
 export interface CreateTransactionRequest {
   transaction_id?: string;
   amount: number;
-  type: 'expense' | 'income';
+  type: 'expense' | 'income' | 'investment';
   category_id: number;
+  bank_account_id: number;
   description: string;
   date?: string;
 }
@@ -39,8 +41,9 @@ export interface CreateTransactionRequest {
 export interface UpdateTransactionRequest {
   transaction_id?: string;
   amount?: number;
-  type?: 'expense' | 'income';
+  type?: 'expense' | 'income' | 'investment';
   category_id?: number;
+  bank_account_id?: number;
   description?: string;
   date?: string;
 }
@@ -66,17 +69,17 @@ export interface BulkTransactionError {
 export interface DateRangeParams {
   start_date: string;
   end_date: string;
-  type?: 'expense' | 'income';
+  type?: 'expense' | 'income' | 'investment';
 }
 
 export interface CreateCategoryRequest {
   name: string;
-  type: 'expense' | 'income';
+  type: 'expense' | 'income' | 'investment';
 }
 
 export interface UpdateCategoryRequest {
   name?: string;
-  type?: 'expense' | 'income';
+  type?: 'expense' | 'income' | 'investment';
 }
 
 export interface BulkDeleteRequest {
@@ -117,6 +120,12 @@ export interface AggregateTableResponse {
     net_amount: number;
     total_income: number;
     total_expenses: number;
+    total_investments: number;
+  };
+  investments: {
+    categories: AggregateTableCategoryData[];
+    total_amount: number;
+    total_transactions: number;
   };
 }
 

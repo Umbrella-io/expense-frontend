@@ -27,7 +27,7 @@ export default function Navigation() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="text-xl font-bold text-gray-900" onClick={closeMenu}>
-            Expense Tracker
+            Financial Tracker
           </Link>
           
           {/* Desktop Navigation */}
