@@ -177,7 +177,7 @@ export async function getRefunds(params?: RefundListParams) {
   const queryParams = new URLSearchParams();
   if (params?.start_date) queryParams.set('start_date', params.start_date);
   if (params?.end_date) queryParams.set('end_date', params.end_date);
-  if (params?.bank_account_id != null) queryParams.set('bank_account_id', String(params.bank_account_id));
+  if (params?.bank_account_id !== undefined) queryParams.set('bank_account_id', String(params.bank_account_id));
   const suffix = queryParams.toString() ? `?${queryParams}` : '';
   return apiGet<RefundGroupResponse[]>(`/api/refunds${suffix}`);
 }

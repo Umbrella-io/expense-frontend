@@ -136,7 +136,7 @@ export default function RefundsPage() {
     reset({
       transaction_id: group.parent.transaction_id,
       amount: group.total_amount,
-      bank_account_id: group.parent.bank_account_id as unknown as number,
+      bank_account_id: Number(group.parent.bank_account_id),
       description: group.parent.description,
       date: group.parent.date?.split('T')[0],
     });
