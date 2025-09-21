@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
-import { createBulkTransactions, getCategories } from '@/lib/api';
-import type { CreateTransactionRequest, Category, BulkTransactionRequest } from '@/lib/types';
+import { createBulkTransactions, getCategories, getBankAccounts } from '@/lib/api';
+import type { CreateTransactionRequest, Category, BulkTransactionRequest, BankAccount } from '@/lib/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import toast from 'react-hot-toast';
 
@@ -13,6 +13,8 @@ export default function BulkTransactions() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [bankAccountsLoading, setBankAccountsLoading] = useState(true);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
 
   const {
     register,
@@ -41,19 +43,26 @@ export default function BulkTransactions() {
   });
 
   useEffect(() => {
-    const fetchCategories = async () => {
+    const fetchData = async () => {
+      setCategoriesLoading(true);
+      setBankAccountsLoading(true);
       try {
-        const fetchedCategories = await getCategories();
+        const [fetchedCategories, fetchedAccounts] = await Promise.all([
+          getCategories(),
+          getBankAccounts(false),
+        ]);
         setCategories(fetchedCategories);
+        setBankAccounts(Array.isArray(fetchedAccounts) ? fetchedAccounts.filter(a => a.is_active !== false) : []);
       } catch (error) {
-        console.error('Error fetching categories:', error);
-        toast.error('Failed to load categories');
+        console.error('Error fetching data:', error);
+        toast.error('Failed to load data');
       } finally {
         setCategoriesLoading(false);
+        setBankAccountsLoading(false);
       }
     };
 
-    fetchCategories();
+    fetchData();
   }, []);
 
   const onSubmit = async (data: BulkTransactionRequest) => {
@@ -107,7 +116,7 @@ export default function BulkTransactions() {
     });
   };
 
-  if (categoriesLoading) {
+  if (categoriesLoading || bankAccountsLoading) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
         <LoadingSpinner />
@@ -226,13 +235,17 @@ export default function BulkTransactions() {
                       Bank Account *
                     </label>
                     <select
-                      {...register(`transactions.${index}.bank_account_id`, { required: 'Bank account is required' })}
+                      {...register(`transactions.${index}.bank_account_id`, { required: 'Bank account is required', valueAsNumber: true })}
                       className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 ${
                         errors.transactions?.[index]?.bank_account_id ? 'border-red-500' : 'border-gray-300'
                       }`}
                     >
                       <option value="">Select bank account</option>
-                      <option value="1">Default Account</option>
+                      {bankAccounts.map(acc => (
+                        <option key={acc.id} value={acc.id}>
+                          {acc.name} {acc.account_number ? `(${acc.account_number})` : ''}
+                        </option>
+                      ))}
                     </select>
                     {errors.transactions?.[index]?.bank_account_id && (
                       <p className="mt-1 text-sm text-red-600">{errors.transactions[index]?.bank_account_id?.message}</p>

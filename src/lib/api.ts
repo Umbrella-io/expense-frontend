@@ -1,4 +1,4 @@
-import type { Transaction, Category, TransactionAggregate, CreateTransactionRequest, CreateCategoryRequest, UpdateTransactionRequest, UpdateCategoryRequest, BulkTransactionRequest, BulkTransactionResponse, BulkDeleteRequest, BulkDeleteResponse, AggregateTableResponse, DateRangeParams, HealthData, RefundCreateRequest, RefundUpdateRequest, RefundGroupResponse } from './types';
+import type { Transaction, Category, TransactionAggregate, CreateTransactionRequest, CreateCategoryRequest, UpdateTransactionRequest, UpdateCategoryRequest, BulkTransactionRequest, BulkTransactionResponse, BulkDeleteRequest, BulkDeleteResponse, AggregateTableResponse, DateRangeParams, HealthData, RefundCreateRequest, RefundUpdateRequest, RefundGroupResponse, BankAccount } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -204,4 +204,22 @@ export async function deleteCategory(id: number) {
 
 export async function getHealth() {
   return apiGet<HealthData>('/health');
+}
+
+// Bank Accounts
+export async function getBankAccounts(includeInactive = false) {
+  const qp = includeInactive ? '?include_inactive=true' : '';
+  return apiGet<BankAccount[]>(`/api/bank-accounts${qp}`);
+}
+
+export async function createBankAccount(data: Omit<BankAccount, 'id' | 'created_at' | 'updated_at'>) {
+  return apiPost<BankAccount>('/api/bank-accounts', data);
+}
+
+export async function updateBankAccount(id: number, data: Partial<Omit<BankAccount, 'id' | 'created_at' | 'updated_at'>>) {
+  return apiPut<BankAccount>(`/api/bank-accounts/${id}`, data);
+}
+
+export async function deleteBankAccount(id: number) {
+  return apiDelete<{ message: string }>(`/api/bank-accounts/${id}`);
 }
