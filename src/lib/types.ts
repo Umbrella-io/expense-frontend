@@ -2,9 +2,11 @@ export interface Transaction {
   id: number;
   transaction_id: string;
   amount: number;
-  type: 'expense' | 'income' | 'investment';
-  category_id: number;
-  category: Category;
+  type: 'expense' | 'income' | 'investment' | 'transfer' | 'refund';
+  bank_account_id: number;
+  category_id?: number;
+  category?: Category;
+  parent_transaction_id?: number | null;
   description?: string;
   date: string;
   created_at: string;
@@ -31,21 +33,23 @@ export interface TransactionAggregate {
 export interface CreateTransactionRequest {
   transaction_id?: string;
   amount: number;
-  type: 'expense' | 'income' | 'investment';
-  category_id: number;
+  type: 'expense' | 'income' | 'investment' | 'transfer' | 'refund';
+  category_id?: number;
   bank_account_id: number;
   description: string;
   date?: string;
+  parent_transaction_id?: number;
 }
 
 export interface UpdateTransactionRequest {
   transaction_id?: string;
   amount?: number;
-  type?: 'expense' | 'income' | 'investment';
+  type?: 'expense' | 'income' | 'investment' | 'transfer' | 'refund';
   category_id?: number;
   bank_account_id?: number;
   description?: string;
   date?: string;
+  parent_transaction_id?: number | null;
 }
 
 export interface BulkTransactionRequest {
@@ -69,7 +73,7 @@ export interface BulkTransactionError {
 export interface DateRangeParams {
   start_date: string;
   end_date: string;
-  type?: 'expense' | 'income' | 'investment';
+  type?: 'expense' | 'income' | 'investment' | 'transfer' | 'refund';
 }
 
 export interface CreateCategoryRequest {
@@ -135,4 +139,33 @@ export interface HealthData {
   uptime?: number;
   version?: string;
   [key: string]: unknown;
+}
+
+// Refund-specific types
+export interface RefundChildInput {
+  transaction_id?: string;
+  amount: number;
+  category_id: number; // must be an expense category
+  description?: string;
+  date?: string; // ISO string
+}
+
+export interface RefundCreateRequest {
+  transaction_id?: string;
+  amount: number; // parent total amount
+  bank_account_id: number;
+  description?: string;
+  date?: string; // ISO string
+  children: RefundChildInput[]; // sum(children.amount) must equal amount
+}
+
+export interface RefundUpdateRequest extends Partial<Omit<RefundCreateRequest, 'children'>> {
+  children: RefundChildInput[]; // replace entire children set atomically
+}
+
+export interface RefundGroupResponse {
+  parent: Transaction; // type=refund, parent_transaction_id=null, no category
+  children: Transaction[]; // type=refund, parent_transaction_id=parent.id
+  total_amount: number;
+  children_sum: number;
 }

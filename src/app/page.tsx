@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
-import { getTransactionAggregate, getTransactionAggregateTable, getTransactions, getTransactionsByDateRange, deleteTransaction, deleteBulkTransactions, updateTransactionCategory, getCategories } from '@/lib/api';
+import { getTransactionAggregate, getTransactionAggregateTable, getTransactions, getTransactionsByDateRange, deleteTransaction, deleteBulkTransactions, updateTransactionCategory, getCategories, deleteTransactionCascade } from '@/lib/api';
 import type { TransactionAggregate, AggregateTableResponse, Transaction, Category } from '@/lib/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import toast from 'react-hot-toast';
@@ -15,7 +15,7 @@ export default function Dashboard() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingCategory, setUpdatingCategory] = useState<number | null>(null);
-  const [filterType, setFilterType] = useState<'all' | 'expense' | 'income' | 'investment'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'expense' | 'income' | 'investment' | 'transfer' | 'refund'>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isDateFiltering, setIsDateFiltering] = useState(false);
@@ -24,6 +24,33 @@ export default function Dashboard() {
   const [aggregateTableData, setAggregateTableData] = useState<AggregateTableResponse | null>(null);
   const [aggregateTableStartDate, setAggregateTableStartDate] = useState('');
   const [aggregateTableEndDate, setAggregateTableEndDate] = useState('');
+
+  // Grouping for refund parent/children
+  const visibleTransactions = useMemo(() =>
+    transactions.filter(tx => !(tx.type === 'refund' && tx.parent_transaction_id != null)),
+    [transactions]
+  );
+
+  const refundChildrenByParent = useMemo(() => {
+    const map = new Map<number, Transaction[]>();
+    transactions.forEach(tx => {
+      if (tx.type === 'refund' && tx.parent_transaction_id != null) {
+        const arr = map.get(tx.parent_transaction_id) || [];
+        arr.push(tx);
+        map.set(tx.parent_transaction_id, arr);
+      }
+    });
+    return map;
+  }, [transactions]);
+
+  const [expandedRefundParents, setExpandedRefundParents] = useState<Set<number>>(new Set());
+  const toggleRefundExpanded = (parentId: number) => {
+    setExpandedRefundParents(prev => {
+      const next = new Set(prev);
+      if (next.has(parentId)) next.delete(parentId); else next.add(parentId);
+      return next;
+    });
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -97,13 +124,22 @@ export default function Dashboard() {
     fetchAggregateTable();
   }, [aggregateTableStartDate, aggregateTableEndDate]);
 
-  const handleDeleteTransaction = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this transaction?')) {
+  const handleDeleteTransaction = async (tx: Transaction) => {
+    // For refund parent (type=refund and no parent_transaction_id), ask cascade confirmation
+    const isRefundParent = tx.type === 'refund' && (tx.parent_transaction_id == null);
+    const message = isRefundParent
+      ? 'This is a refund parent. Delete it and all its children?'
+      : 'Are you sure you want to delete this transaction?';
+    if (!confirm(message)) {
       return;
     }
 
     try {
-      await deleteTransaction(id);
+      if (isRefundParent) {
+        await deleteTransactionCascade(tx.id);
+      } else {
+        await deleteTransaction(tx.id);
+      }
       toast.success('Transaction deleted successfully');
       fetchData(); // Refresh data
     } catch (error) {
@@ -157,14 +193,15 @@ export default function Dashboard() {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      const allIds = new Set(transactions.map(tx => tx.id));
+      // Only visible top-level transactions
+      const allIds = new Set(visibleTransactions.map(tx => tx.id));
       setSelectedTransactions(allIds);
     } else {
       setSelectedTransactions(new Set());
     }
   };
 
-  const handleCategoryChange = async (transactionId: number, newCategoryId: number, transactionType: 'expense' | 'income' | 'investment') => {
+  const handleCategoryChange = async (transactionId: number, newCategoryId: number, transactionType: 'expense' | 'income' | 'investment' | 'refund' | 'transfer') => {
     // Validate that the category type matches the transaction type
     const selectedCategory = categories.find(cat => cat.id === newCategoryId);
     if (!selectedCategory) {
@@ -172,9 +209,17 @@ export default function Dashboard() {
       return;
     }
 
-    if (selectedCategory.type !== transactionType) {
-      toast.error(`Cannot assign ${selectedCategory.type} category to ${transactionType} transaction`);
-      return;
+    if (transactionType === 'refund') {
+      // Refund child categories must be expense
+      if (selectedCategory.type !== 'expense') {
+        toast.error('Refund children must use an expense category');
+        return;
+      }
+    } else {
+      if (selectedCategory.type !== transactionType) {
+        toast.error(`Cannot assign ${selectedCategory.type} category to ${transactionType} transaction`);
+        return;
+      }
     }
 
     // Preserve scroll position
@@ -571,13 +616,15 @@ export default function Dashboard() {
               <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Type:</label>
               <select
                 value={filterType}
-                onChange={(e) => setFilterType(e.target.value as 'all' | 'expense' | 'income' | 'investment')}
+                onChange={(e) => setFilterType(e.target.value as 'all' | 'expense' | 'income' | 'investment' | 'transfer' | 'refund')}
                 className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1 md:flex-initial"
               >
                 <option value="all">All</option>
                 <option value="expense">Expense</option>
                 <option value="income">Income</option>
                 <option value="investment">Investment</option>
+                <option value="transfer">Transfer</option>
+                <option value="refund">Refund</option>
               </select>
             </div>
 
@@ -621,7 +668,7 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-        {transactions.length === 0 ? (
+        {visibleTransactions.length === 0 ? (
           <div className="text-gray-500 text-center py-8">No transactions found.</div>
         ) : (
           <>
@@ -631,33 +678,46 @@ export default function Dashboard() {
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
-                    checked={transactions.length > 0 && selectedTransactions.size === transactions.length}
+                    checked={visibleTransactions.length > 0 && selectedTransactions.size === visibleTransactions.length}
                     onChange={(e) => handleSelectAll(e.target.checked)}
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                   <span className="text-sm text-gray-600">Select All</span>
                 </div>
-                <span className="text-sm text-gray-600">{transactions.length} transactions</span>
+                <span className="text-sm text-gray-600">{visibleTransactions.length} transactions</span>
               </div>
-              {transactions.map(tx => (
-                <div key={tx.id} className={`border rounded-lg p-4 space-y-3 ${selectedTransactions.has(tx.id) ? 'bg-blue-50 border-blue-200' : 'bg-white'}`}>
+              {visibleTransactions.map((tx: Transaction) => (
+                <div
+                  key={tx.id}
+                  onClick={() => {
+                    if (tx.type === 'refund' && (tx.parent_transaction_id == null)) toggleRefundExpanded(tx.id);
+                  }}
+                  className={`border rounded-lg p-4 space-y-3 ${selectedTransactions.has(tx.id) ? 'bg-blue-50 border-blue-200' : 'bg-white'} ${
+                    tx.type === 'refund' && (tx.parent_transaction_id == null) ? 'bg-gray-50 hover:bg-gray-100 cursor-pointer' : ''
+                  }`}
+                >
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
                       <input
+                        onClick={(e) => e.stopPropagation()}
                         type="checkbox"
                         checked={selectedTransactions.has(tx.id)}
                         onChange={(e) => handleSelectTransaction(tx.id, e.target.checked)}
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mt-1"
                       />
                       <div>
-                        <div className="font-medium text-gray-900">{tx.description || 'No description'}</div>
+                        <div className="font-medium text-gray-900 flex items-center gap-2">
+                          <span>{tx.description || 'No description'}</span>
+                        </div>
                         <div className="text-sm text-gray-500 font-mono">{tx.transaction_id || 'No ID'}</div>
                       </div>
                     </div>
                     <div className="text-right">
                       <div className={`font-semibold ${
                         tx.type === 'income' ? 'text-green-600' : 
-                        tx.type === 'investment' ? 'text-purple-600' : 'text-red-600'
+                        tx.type === 'investment' ? 'text-purple-600' : 
+                        tx.type === 'refund' ? 'text-teal-600' :
+                        'text-red-600'
                       }`}>
                         {formatCurrency(tx.amount)}
                       </div>
@@ -666,112 +726,205 @@ export default function Dashboard() {
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">{new Date(tx.date).toLocaleDateString()}</span>
-                    <button
-                      onClick={() => handleDeleteTransaction(tx.id)}
-                      className="text-red-600 hover:text-red-800 font-medium"
-                    >
-                      Delete
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(tx); }}
+                        className={`text-red-600 hover:text-red-800 font-medium ${
+                          tx.type === 'refund' ? 'text-teal-600' : ''
+                        }`}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <label className="text-sm text-gray-600">Category:</label>
                     <select
+                      onClick={(e) => e.stopPropagation()}
                       value={tx.category_id || ''}
                       onChange={(e) => handleCategoryChange(tx.id, Number(e.target.value), tx.type)}
-                      disabled={updatingCategory === tx.id}
+                      disabled={updatingCategory === tx.id || (tx.type === 'refund' && (tx.parent_transaction_id == null))}
                       className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                     >
-                      {categories
-                        .filter(cat => cat.type === tx.type)
-                        .map(category => (
-                          <option key={category.id} value={category.id}>
-                            {category.name}
-                          </option>
-                        ))}
+                      {(tx.type === 'refund'
+                        ? categories.filter(cat => cat.type === 'expense')
+                        : categories.filter(cat => cat.type === tx.type)
+                      ).map(category => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
                     </select>
                     {updatingCategory === tx.id && (
                       <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
                     )}
                   </div>
+
+                  {/* Refund children expanded list (mobile) */}
+                  {tx.type === 'refund' && expandedRefundParents.has(tx.id) && (
+                    <div className="mt-2 border-t pt-2 space-y-2">
+                      {(refundChildrenByParent.get(tx.id) || []).map((child: Transaction) => (
+                        <div key={child.id} className="bg-gray-50 border rounded p-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-sm text-gray-900 font-medium">{child.category?.name || '-'}</div>
+                              <div className="text-xs text-gray-600 font-mono">{child.transaction_id || '-'}</div>
+                            </div>
+                            <div className="text-sm font-semibold text-teal-700">{formatCurrency(child.amount)}</div>
+                          </div>
+                          <div className="mt-1 flex items-center justify-between text-xs text-gray-600">
+                            <span>{new Date(child.date).toLocaleDateString()}</span>
+                            <button
+                              onClick={() => handleDeleteTransaction(child)}
+                              className="text-red-600 hover:text-red-800 font-medium"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {(refundChildrenByParent.get(tx.id) || []).length === 0 && (
+                        <div className="text-xs text-gray-500">No refund items</div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
-
             {/* Desktop Table View */}
-            <div className="hidden lg:block overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead>
-                  <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                      <input
-                        type="checkbox"
-                        checked={transactions.length > 0 && selectedTransactions.size === transactions.length}
-                        onChange={(e) => handleSelectAll(e.target.checked)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                    </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Transaction ID</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
-                    <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-100">
-                  {transactions.map(tx => (
-                    <tr key={tx.id} className={selectedTransactions.has(tx.id) ? 'bg-blue-50' : ''}>
-                      <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-600">
-                        <input
-                          type="checkbox"
-                          checked={selectedTransactions.has(tx.id)}
-                          onChange={(e) => handleSelectTransaction(tx.id, e.target.checked)}
-                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-600 font-mono">{tx.transaction_id || '-'}</td>
-                      <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700">{new Date(tx.date).toLocaleDateString()}</td>
-                      <td className="px-3 py-2 text-sm text-gray-700 max-w-xs truncate">{tx.description || '-'}</td>
-                      <td className="px-3 py-2 text-sm text-gray-700">
-                        <select
-                          value={tx.category_id || ''}
-                          onChange={(e) => handleCategoryChange(tx.id, Number(e.target.value), tx.type)}
-                          disabled={updatingCategory === tx.id}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {categories
-                            .filter(cat => cat.type === tx.type)
-                            .map(category => (
-                              <option key={category.id} value={category.id}>
-                                {category.name}
-                              </option>
+            <div className="hidden lg:block overflow-x-auto mt-6">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead>
+              <tr>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  <input
+                    type="checkbox"
+                    checked={visibleTransactions.length > 0 && selectedTransactions.size === visibleTransactions.length}
+                    onChange={(e) => handleSelectAll(e.target.checked)}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                </th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Transaction ID</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-100">
+              {visibleTransactions.map((tx: Transaction) => (
+                <Fragment key={tx.id}>
+                <tr
+                  onClick={() => {
+                    if (tx.type === 'refund' && (tx.parent_transaction_id == null)) toggleRefundExpanded(tx.id);
+                  }}
+                  className={`${selectedTransactions.has(tx.id) ? 'bg-blue-50' : ''} ${
+                    tx.type === 'refund' && (tx.parent_transaction_id == null) ? 'bg-gray-50 hover:bg-gray-100 cursor-pointer' : ''
+                  }`}
+                >
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-600">
+                    <input
+                      onClick={(e) => e.stopPropagation()}
+                      type="checkbox"
+                      checked={selectedTransactions.has(tx.id)}
+                      onChange={(e) => handleSelectTransaction(tx.id, e.target.checked)}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-600 font-mono">{tx.transaction_id || '-'}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700">{new Date(tx.date).toLocaleDateString()}</td>
+                  <td className="px-3 py-2 text-sm text-gray-700 max-w-xs truncate">{tx.description || '-'}</td>
+                  <td className="px-3 py-2 text-sm text-gray-700">
+                    <select
+                      onClick={(e) => e.stopPropagation()}
+                      value={tx.category_id || ''}
+                      onChange={(e) => handleCategoryChange(tx.id, Number(e.target.value), tx.type)}
+                      disabled={updatingCategory === tx.id || (tx.type === 'refund' && (tx.parent_transaction_id == null))}
+                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {(tx.type === 'refund'
+                        ? categories.filter(cat => cat.type === 'expense')
+                        : categories.filter(cat => cat.type === tx.type)
+                      ).map(category => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </select>
+                    {updatingCategory === tx.id && (
+                      <div className="flex items-center justify-center mt-1">
+                        <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700 capitalize">{tx.type}</td>
+                  <td className={`px-3 py-2 whitespace-nowrap text-sm text-right font-semibold ${
+                    tx.type === 'income' ? 'text-green-600' : 
+                    tx.type === 'investment' ? 'text-purple-600' :
+                    tx.type === 'refund' ? 'text-teal-600' :
+                    'text-red-600'
+                  }`}>{formatCurrency(tx.amount)}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-center">
+                    <div className="inline-flex items-center gap-2">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(tx); }}
+                        className="text-red-600 hover:text-red-800 font-medium"
+                        title="Delete transaction"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                {tx.type === 'refund' && expandedRefundParents.has(tx.id) && (
+                  <tr className="bg-gray-50">
+                    <td colSpan={8} className="px-3 py-3">
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-100">
+                            <tr>
+                              <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase">Child ID</th>
+                              <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                              <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                              <th className="px-2 py-1 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                              <th className="px-2 py-1 text-center text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-100">
+                            {(refundChildrenByParent.get(tx.id) || []).map((child: Transaction) => (
+                              <tr key={child.id}>
+                                <td className="px-2 py-1 text-sm font-mono text-gray-700">{child.transaction_id || '-'}</td>
+                                <td className="px-2 py-1 text-sm text-gray-700">{new Date(child.date).toLocaleDateString()}</td>
+                                <td className="px-2 py-1 text-sm text-gray-700">{child.category?.name || '-'}</td>
+                                <td className="px-2 py-1 text-sm text-right font-semibold text-teal-700">{formatCurrency(child.amount)}</td>
+                                <td className="px-2 py-1 text-sm text-center">
+                                  <button
+                                    onClick={() => handleDeleteTransaction(child)}
+                                    className="text-red-600 hover:text-red-800 font-medium"
+                                    title="Delete child"
+                                  >
+                                    Delete
+                                  </button>
+                                </td>
+                              </tr>
                             ))}
-                        </select>
-                        {updatingCategory === tx.id && (
-                          <div className="flex items-center justify-center mt-1">
-                            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700 capitalize">{tx.type}</td>
-                      <td className={`px-3 py-2 whitespace-nowrap text-sm text-right font-semibold ${
-                        tx.type === 'income' ? 'text-green-600' : 
-                        tx.type === 'investment' ? 'text-purple-600' : 'text-red-600'
-                      }`}>{formatCurrency(tx.amount)}</td>
-                      <td className="px-3 py-2 whitespace-nowrap text-sm text-center">
-                        <button
-                          onClick={() => handleDeleteTransaction(tx.id)}
-                          className="text-red-600 hover:text-red-800 font-medium"
-                          title="Delete transaction"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                            {(refundChildrenByParent.get(tx.id) || []).length === 0 && (
+                              <tr>
+                                <td colSpan={5} className="px-2 py-2 text-sm text-gray-500 text-center">No refund items</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
             </div>
           </>
         )}

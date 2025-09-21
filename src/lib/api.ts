@@ -1,4 +1,4 @@
-import type { Transaction, Category, TransactionAggregate, CreateTransactionRequest, CreateCategoryRequest, UpdateTransactionRequest, UpdateCategoryRequest, BulkTransactionRequest, BulkTransactionResponse, BulkDeleteRequest, BulkDeleteResponse, AggregateTableResponse, DateRangeParams, HealthData } from './types';
+import type { Transaction, Category, TransactionAggregate, CreateTransactionRequest, CreateCategoryRequest, UpdateTransactionRequest, UpdateCategoryRequest, BulkTransactionRequest, BulkTransactionResponse, BulkDeleteRequest, BulkDeleteResponse, AggregateTableResponse, DateRangeParams, HealthData, RefundCreateRequest, RefundUpdateRequest, RefundGroupResponse } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -100,7 +100,7 @@ export async function apiDelete<T>(endpoint: string, data?: unknown): Promise<T>
 }
 
 // API functions for specific endpoints
-export async function getTransactions(type?: 'expense' | 'income' | 'investment') {
+export async function getTransactions(type?: 'expense' | 'income' | 'investment' | 'transfer' | 'refund') {
   const queryParam = type ? `?type=${type}` : '';
   return apiGet<Transaction[]>(`/api/transactions${queryParam}`);
 }
@@ -123,6 +123,10 @@ export async function updateTransactionCategory(id: number, categoryId: number) 
 
 export async function deleteTransaction(id: number) {
   return apiDelete<{ message: string }>(`/api/transactions/${id}`);
+}
+
+export async function deleteTransactionCascade(id: number) {
+  return apiDelete<{ message: string }>(`/api/transactions/${id}?cascade=true`);
 }
 
 export async function createBulkTransactions(data: BulkTransactionRequest) {
@@ -152,6 +156,30 @@ export async function getTransactionAggregateTable(startDate: string, endDate: s
     end_date: endDate
   });
   return apiGet<AggregateTableResponse>(`/api/transactions/aggregate-table?${queryParams}`);
+}
+
+// Refunds endpoints
+export async function createRefund(data: RefundCreateRequest) {
+  return apiPost<RefundGroupResponse>('/api/refunds', data);
+}
+
+export async function updateRefund(id: number, data: RefundUpdateRequest) {
+  return apiPut<RefundGroupResponse>(`/api/refunds/${id}`, data);
+}
+
+export interface RefundListParams {
+  start_date?: string; // YYYY-MM-DD
+  end_date?: string;   // YYYY-MM-DD
+  bank_account_id?: number;
+}
+
+export async function getRefunds(params?: RefundListParams) {
+  const queryParams = new URLSearchParams();
+  if (params?.start_date) queryParams.set('start_date', params.start_date);
+  if (params?.end_date) queryParams.set('end_date', params.end_date);
+  if (params?.bank_account_id != null) queryParams.set('bank_account_id', String(params.bank_account_id));
+  const suffix = queryParams.toString() ? `?${queryParams}` : '';
+  return apiGet<RefundGroupResponse[]>(`/api/refunds${suffix}`);
 }
 
 export async function getCategories() {
