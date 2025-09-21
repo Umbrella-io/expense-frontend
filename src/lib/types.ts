@@ -141,6 +141,19 @@ export interface HealthData {
   [key: string]: unknown;
 }
 
+// Bank Accounts
+export interface BankAccount {
+  id: number;
+  name: string;
+  account_number?: string | null;
+  bank_name: string;
+  account_type: 'checking' | 'savings' | 'credit' | 'investment' | 'other';
+  balance?: number;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // Refund-specific types
 /**
  * Identifier for an expense category.

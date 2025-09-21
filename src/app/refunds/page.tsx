@@ -9,8 +9,9 @@ import {
   createRefund,
   updateRefund,
   deleteTransactionCascade,
+  getBankAccounts,
 } from '@/lib/api';
-import type { Category, RefundChildInput, RefundCreateRequest, RefundGroupResponse } from '@/lib/types';
+import type { Category, RefundChildInput, RefundCreateRequest, RefundGroupResponse, BankAccount } from '@/lib/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
 
 export default function RefundsPage() {
@@ -19,6 +20,7 @@ export default function RefundsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [refunds, setRefunds] = useState<RefundGroupResponse[] | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
 
   // Parent form
   const {
@@ -51,12 +53,14 @@ export default function RefundsPage() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [cats, list] = await Promise.all([
+      const [cats, list, accounts] = await Promise.all([
         getCategories(),
-        getRefunds({})
+        getRefunds({}),
+        getBankAccounts(false),
       ]);
       setCategories(cats);
       setRefunds(Array.isArray(list) ? list : []);
+      setBankAccounts(Array.isArray(accounts) ? accounts.filter(a => a.is_active !== false) : []);
     } catch (e) {
       console.error(e);
       toast.error('Failed to load refunds');
@@ -198,11 +202,15 @@ export default function RefundsPage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Bank Account *</label>
               <select
-                {...register('bank_account_id', { required: 'Bank account is required' })}
+                {...register('bank_account_id', { required: 'Bank account is required', valueAsNumber: true })}
                 className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.bank_account_id ? 'border-red-500' : 'border-gray-300'} text-gray-900`}
               >
                 <option value="">Select bank account</option>
-                <option value="1">Default Account</option>
+                {bankAccounts.map(acc => (
+                  <option key={acc.id} value={acc.id}>
+                    {acc.name} {acc.account_number ? `(${acc.account_number})` : ''}
+                  </option>
+                ))}
               </select>
             </div>
             <div>

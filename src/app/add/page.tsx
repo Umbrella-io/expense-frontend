@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
-import { createTransaction, getCategories } from '@/lib/api';
-import type { CreateTransactionRequest, Category } from '@/lib/types';
+import { createTransaction, getCategories, getBankAccounts } from '@/lib/api';
+import type { CreateTransactionRequest, Category, BankAccount } from '@/lib/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import toast from 'react-hot-toast';
 
@@ -13,6 +13,8 @@ export default function AddTransaction() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [bankAccountsLoading, setBankAccountsLoading] = useState(true);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
 
   const {
     register,
@@ -25,19 +27,26 @@ export default function AddTransaction() {
   const watchType = watch('type');
 
   useEffect(() => {
-    const fetchCategories = async () => {
+    const fetchData = async () => {
+      setCategoriesLoading(true);
+      setBankAccountsLoading(true);
       try {
-        const fetchedCategories = await getCategories();
+        const [fetchedCategories, fetchedAccounts] = await Promise.all([
+          getCategories(),
+          getBankAccounts(false),
+        ]);
         setCategories(fetchedCategories);
+        setBankAccounts(Array.isArray(fetchedAccounts) ? fetchedAccounts.filter(a => a.is_active !== false) : []);
       } catch (error) {
-        console.error('Error fetching categories:', error);
-        toast.error('Failed to load categories');
+        console.error('Error fetching data:', error);
+        toast.error('Failed to load form data');
       } finally {
         setCategoriesLoading(false);
+        setBankAccountsLoading(false);
       }
     };
 
-    fetchCategories();
+    fetchData();
   }, []);
 
   useEffect(() => {
@@ -77,7 +86,7 @@ export default function AddTransaction() {
 
   const filteredCategories = categories.filter(cat => cat.type === watchType);
 
-  if (categoriesLoading) {
+  if (categoriesLoading || bankAccountsLoading) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
         <LoadingSpinner />
@@ -190,13 +199,17 @@ export default function AddTransaction() {
             </label>
             <select
               id="bank_account_id"
-              {...register('bank_account_id', { required: 'Bank account is required' })}
+              {...register('bank_account_id', { required: 'Bank account is required', valueAsNumber: true })}
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 ${
                 errors.bank_account_id ? 'border-red-500' : 'border-gray-300'
               }`}
             >
               <option value="">Select bank account</option>
-              <option value="1">Default Account</option>
+              {bankAccounts.map((acc) => (
+                <option key={acc.id} value={acc.id}>
+                  {acc.name} {acc.account_number ? `(${acc.account_number})` : ''}
+                </option>
+              ))}
             </select>
             {errors.bank_account_id && (
               <p className="mt-1 text-sm text-red-600">{errors.bank_account_id.message}</p>

@@ -19,6 +19,7 @@ export default function Navigation() {
     { href: '/', label: 'Dashboard' },
     { href: '/add', label: 'Add Transaction' },
     { href: '/refunds', label: 'Refunds' },
+    { href: '/bank-accounts', label: 'Bank Accounts' },
     { href: '/categories', label: 'Categories' },
     { href: '/bulk', label: 'Bulk Upload' },
     { href: '/health', label: 'Health' }
