@@ -12,6 +12,15 @@ import {
 } from "@/lib/api";
 import type { BankAccount } from "@/lib/types";
 
+type FormValues = {
+  name: string;
+  account_number?: string;
+  bank_name: string;
+  account_type: BankAccount["account_type"];
+  balance?: number;
+  is_active?: boolean;
+};
+
 export default function BankAccountsPage() {
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,14 +32,7 @@ export default function BankAccountsPage() {
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<{
-    name: string;
-    account_number?: string;
-    bank_name: string;
-    account_type: BankAccount["account_type"];
-    balance?: number;
-    is_active?: boolean;
-  }>();
+  } = useForm<FormValues>();
 
   const loadAccounts = async () => {
     setLoading(true);
@@ -49,7 +51,7 @@ export default function BankAccountsPage() {
     loadAccounts();
   }, []);
 
-  const onSubmit = async (form: any) => {
+  const onSubmit = async (form: FormValues) => {
     setSubmitting(true);
     try {
       if (editing) {
@@ -64,7 +66,7 @@ export default function BankAccountsPage() {
         await updateBankAccount(editing.id, payload);
         toast.success("Bank account updated");
       } else {
-        const payload = {
+        const payload: Omit<BankAccount, 'id' | 'created_at' | 'updated_at'> = {
           name: form.name,
           account_number: form.account_number || undefined,
           bank_name: form.bank_name,
@@ -72,7 +74,7 @@ export default function BankAccountsPage() {
           balance: form.balance !== undefined && form.balance !== null ? Number(form.balance) : 0,
           is_active: form.is_active ?? true,
         };
-        await createBankAccount(payload as any);
+        await createBankAccount(payload);
         toast.success("Bank account created");
       }
       setEditing(null);
@@ -110,7 +112,7 @@ export default function BankAccountsPage() {
     }
   };
 
-  const activeAccounts = useMemo(() => accounts.filter(a => a.is_active !== false), [accounts]);
+  // const activeAccounts = useMemo(() => accounts.filter(a => a.is_active !== false), [accounts]);
 
   if (loading) {
     return (
