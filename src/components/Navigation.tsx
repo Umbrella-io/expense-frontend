@@ -18,6 +18,7 @@ export default function Navigation() {
   const navLinks = [
     { href: '/', label: 'Dashboard' },
     { href: '/add', label: 'Add Transaction' },
+    { href: '/refunds', label: 'Refunds' },
     { href: '/categories', label: 'Categories' },
     { href: '/bulk', label: 'Bulk Upload' },
     { href: '/health', label: 'Health' }
