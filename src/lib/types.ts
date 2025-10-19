@@ -1,9 +1,25 @@
+// Bank Accounts
+export interface BankAccount {
+  id: number;
+  name: string;
+  account_number?: string | null;
+  bank_name: string;
+  account_type: 'checking' | 'savings' | 'credit' | 'investment' | 'other';
+  balance?: number;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Transaction {
   id: number;
   transaction_id: string;
   amount: number;
   type: 'expense' | 'income' | 'investment' | 'transfer' | 'refund';
   bank_account_id: number;
+  bank_account?: BankAccount;
+  destination_bank_account_id?: number | null;
+  destination_bank_account?: BankAccount | null;
   category_id?: number;
   category?: Category;
   parent_transaction_id?: number | null;
@@ -45,8 +61,9 @@ export interface UpdateTransactionRequest {
   transaction_id?: string;
   amount?: number;
   type?: 'expense' | 'income' | 'investment' | 'transfer' | 'refund';
-  category_id?: number;
+  category_id?: number | null;
   bank_account_id?: number;
+  destination_bank_account_id?: number | null;
   description?: string;
   date?: string;
   parent_transaction_id?: number | null;
@@ -139,19 +156,6 @@ export interface HealthData {
   uptime?: number;
   version?: string;
   [key: string]: unknown;
-}
-
-// Bank Accounts
-export interface BankAccount {
-  id: number;
-  name: string;
-  account_number?: string | null;
-  bank_name: string;
-  account_type: 'checking' | 'savings' | 'credit' | 'investment' | 'other';
-  balance?: number;
-  is_active?: boolean;
-  created_at?: string;
-  updated_at?: string;
 }
 
 // Refund-specific types

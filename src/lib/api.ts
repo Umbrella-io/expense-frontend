@@ -125,6 +125,24 @@ export async function updateTransactionType(id: number, type: 'expense' | 'incom
   return apiPut<Transaction>(`/api/transactions/${id}`, { type, category_id: categoryId });
 }
 
+export async function updateTransactionBankAccounts(
+  id: number, 
+  bankAccountId: number, 
+  destinationBankAccountId?: number | null
+) {
+  const payload: UpdateTransactionRequest = {
+    bank_account_id: bankAccountId,
+    destination_bank_account_id: destinationBankAccountId
+  };
+  
+  // If destination is provided and different from source, auto-change to transfer
+  if (destinationBankAccountId && destinationBankAccountId !== bankAccountId) {
+    payload.type = 'transfer';
+  }
+  
+  return apiPut<Transaction>(`/api/transactions/${id}`, payload);
+}
+
 export async function deleteTransaction(id: number) {
   return apiDelete<{ message: string }>(`/api/transactions/${id}`);
 }

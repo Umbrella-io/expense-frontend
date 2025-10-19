@@ -2,8 +2,8 @@
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
-import { getTransactionAggregate, getTransactionAggregateTable, getTransactions, getTransactionsByDateRange, deleteTransaction, deleteBulkTransactions, updateTransactionCategory, deleteTransactionCascade, updateTransactionType } from '@/lib/api';
-import type { TransactionAggregate, AggregateTableResponse, Transaction } from '@/lib/types';
+import { getTransactionAggregate, getTransactionAggregateTable, getTransactions, getTransactionsByDateRange, deleteTransaction, deleteBulkTransactions, updateTransactionCategory, deleteTransactionCascade, updateTransactionType, getBankAccounts, updateTransactionBankAccounts } from '@/lib/api';
+import type { TransactionAggregate, AggregateTableResponse, Transaction, BankAccount } from '@/lib/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import toast from 'react-hot-toast';
 import { useCategories } from '@/contexts/CategoriesContext';
@@ -14,9 +14,11 @@ export default function Dashboard() {
   const { categories, getFirstCategoryByType } = useCategories();
   const [data, setData] = useState<TransactionAggregate | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingCategory, setUpdatingCategory] = useState<number | null>(null);
   const [updatingType, setUpdatingType] = useState<number | null>(null);
+  const [updatingBankAccount, setUpdatingBankAccount] = useState<number | null>(null);
   const [filterType, setFilterType] = useState<'all' | 'expense' | 'income' | 'investment' | 'transfer' | 'refund'>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -57,7 +59,10 @@ export default function Dashboard() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const aggregate = await getTransactionAggregate();
+      const [aggregate, bankAccountsData] = await Promise.all([
+        getTransactionAggregate(),
+        getBankAccounts()
+      ]);
       
       console.log('Fetched aggregate:', aggregate);
       // Defensive: ensure categories is an object
@@ -65,6 +70,7 @@ export default function Dashboard() {
         aggregate.categories = {};
       }
       setData(aggregate);
+      setBankAccounts(bankAccountsData);
 
       let txs: Transaction[];
       if (isDateFiltering && startDate && endDate) {
@@ -299,6 +305,69 @@ export default function Dashboard() {
       });
     } finally {
       setUpdatingType(null);
+    }
+  };
+
+  const handleBankAccountChange = async (
+    transactionId: number,
+    field: 'source' | 'destination',
+    newBankAccountId: number | null
+  ) => {
+    const transaction = transactions.find(tx => tx.id === transactionId);
+    if (!transaction) return;
+
+    let sourceBankId = transaction.bank_account_id;
+    let destBankId = transaction.destination_bank_account_id ?? null;
+
+    if (field === 'source') {
+      if (newBankAccountId === null) {
+        toast.error('Source bank account is required');
+        return;
+      }
+      sourceBankId = newBankAccountId;
+    } else {
+      destBankId = newBankAccountId;
+    }
+
+    // Validation: source and destination can't be the same
+    if (destBankId !== null && sourceBankId === destBankId) {
+      toast.error('Source and destination bank accounts cannot be the same');
+      return;
+    }
+
+    // Preserve scroll position
+    const scrollPosition = window.scrollY;
+
+    setUpdatingBankAccount(transactionId);
+    try {
+      const updatedTx = await updateTransactionBankAccounts(transactionId, sourceBankId, destBankId);
+      
+      // Update the transaction in the local state
+      setTransactions(prevTransactions => 
+        prevTransactions.map(tx => 
+          tx.id === transactionId ? updatedTx : tx
+        )
+      );
+      
+      // Restore scroll position after state update
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollPosition);
+      });
+      
+      if (updatedTx.type === 'transfer') {
+        toast.success('Updated to transfer transaction');
+      } else {
+        toast.success('Bank accounts updated successfully');
+      }
+    } catch (error) {
+      console.error('Error updating bank accounts:', error);
+      toast.error('Failed to update bank accounts');
+      // Restore scroll position even on error
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollPosition);
+      });
+    } finally {
+      setUpdatingBankAccount(null);
     }
   };
 
@@ -824,6 +893,65 @@ export default function Dashboard() {
                       <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
                     )}
                   </div>
+                  
+                  {/* Source Bank Account */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-gray-600">Source:</label>
+                    <select
+                      onClick={(e) => e.stopPropagation()}
+                      value={tx.bank_account_id}
+                      onChange={(e) => handleBankAccountChange(tx.id, 'source', Number(e.target.value))}
+                      disabled={updatingBankAccount === tx.id}
+                      className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                    >
+                      {bankAccounts.map(account => (
+                        <option key={account.id} value={account.id}>
+                          {account.name}
+                        </option>
+                      ))}
+                    </select>
+                    {updatingBankAccount === tx.id && (
+                      <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    )}
+                  </div>
+
+                  {/* Destination Bank Account - only show if dest exists or show option to add */}
+                  {(tx.destination_bank_account_id !== null && tx.destination_bank_account_id !== undefined) || tx.type === 'transfer' ? (
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-gray-600">Destination:</label>
+                      <select
+                        onClick={(e) => e.stopPropagation()}
+                        value={tx.destination_bank_account_id || ''}
+                        onChange={(e) => handleBankAccountChange(tx.id, 'destination', e.target.value ? Number(e.target.value) : null)}
+                        disabled={updatingBankAccount === tx.id}
+                        className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                      >
+                        <option value="">None</option>
+                        {bankAccounts.map(account => (
+                          <option key={account.id} value={account.id}>
+                            {account.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Show dropdown by triggering a change
+                          const firstAvailable = bankAccounts.find(acc => acc.id !== tx.bank_account_id);
+                          if (firstAvailable) {
+                            handleBankAccountChange(tx.id, 'destination', firstAvailable.id);
+                          }
+                        }}
+                        disabled={updatingBankAccount === tx.id}
+                        className="text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                      >
+                        + Add destination bank
+                      </button>
+                    </div>
+                  )}
 
                   {/* Refund children expanded list (mobile) */}
                   {tx.type === 'refund' && expandedRefundParents.has(tx.id) && (
@@ -872,6 +1000,8 @@ export default function Dashboard() {
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Transaction ID</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Source Bank</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Dest Bank</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                 <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
@@ -901,6 +1031,63 @@ export default function Dashboard() {
                   <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-600 font-mono">{tx.transaction_id || '-'}</td>
                   <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700">{new Date(tx.date).toLocaleDateString()}</td>
                   <td className="px-3 py-2 text-sm text-gray-700 max-w-xs truncate">{tx.description || '-'}</td>
+                  
+                  {/* Source Bank */}
+                  <td className="px-3 py-2 text-sm text-gray-700">
+                    <select
+                      onClick={(e) => e.stopPropagation()}
+                      value={tx.bank_account_id}
+                      onChange={(e) => handleBankAccountChange(tx.id, 'source', Number(e.target.value))}
+                      disabled={updatingBankAccount === tx.id}
+                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {bankAccounts.map(account => (
+                        <option key={account.id} value={account.id}>
+                          {account.name}
+                        </option>
+                      ))}
+                    </select>
+                    {updatingBankAccount === tx.id && (
+                      <div className="flex items-center justify-center mt-1">
+                        <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                      </div>
+                    )}
+                  </td>
+
+                  {/* Destination Bank */}
+                  <td className="px-3 py-2 text-sm text-gray-700">
+                    {(tx.destination_bank_account_id !== null && tx.destination_bank_account_id !== undefined) || tx.type === 'transfer' ? (
+                      <select
+                        onClick={(e) => e.stopPropagation()}
+                        value={tx.destination_bank_account_id || ''}
+                        onChange={(e) => handleBankAccountChange(tx.id, 'destination', e.target.value ? Number(e.target.value) : null)}
+                        disabled={updatingBankAccount === tx.id}
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <option value="">None</option>
+                        {bankAccounts.map(account => (
+                          <option key={account.id} value={account.id}>
+                            {account.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const firstAvailable = bankAccounts.find(acc => acc.id !== tx.bank_account_id);
+                          if (firstAvailable) {
+                            handleBankAccountChange(tx.id, 'destination', firstAvailable.id);
+                          }
+                        }}
+                        disabled={updatingBankAccount === tx.id}
+                        className="text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                      >
+                        + Add
+                      </button>
+                    )}
+                  </td>
+
                   <td className="px-3 py-2 text-sm text-gray-700">
                     <select
                       onClick={(e) => e.stopPropagation()}
@@ -964,7 +1151,7 @@ export default function Dashboard() {
                 </tr>
                 {tx.type === 'refund' && expandedRefundParents.has(tx.id) && (
                   <tr className="bg-gray-50">
-                    <td colSpan={8} className="px-3 py-3">
+                    <td colSpan={10} className="px-3 py-3">
                       <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200">
                           <thead className="bg-gray-100">
