@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { CategoriesProvider } from "@/contexts/CategoriesContext";
 import AuthWrapper from "@/components/AuthWrapper";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -21,21 +22,23 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <AuthProvider>
-          <AuthWrapper>
-            {children}
-          </AuthWrapper>
-          <Toaster 
-            position="top-right" 
-            toastOptions={{
-              style: {
+          <CategoriesProvider>
+            <AuthWrapper>
+              {children}
+            </AuthWrapper>
+            <Toaster 
+              position="top-right" 
+              toastOptions={{
+                style: {
+                  position: 'fixed',
+                },
+              }}
+              containerStyle={{
                 position: 'fixed',
-              },
-            }}
-            containerStyle={{
-              position: 'fixed',
-              zIndex: 9999,
-            }}
-          />
+                zIndex: 9999,
+              }}
+            />
+          </CategoriesProvider>
         </AuthProvider>
       </body>
     </html>

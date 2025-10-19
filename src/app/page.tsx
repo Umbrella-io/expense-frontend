@@ -2,19 +2,21 @@
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
-import { getTransactionAggregate, getTransactionAggregateTable, getTransactions, getTransactionsByDateRange, deleteTransaction, deleteBulkTransactions, updateTransactionCategory, getCategories, deleteTransactionCascade } from '@/lib/api';
-import type { TransactionAggregate, AggregateTableResponse, Transaction, Category } from '@/lib/types';
+import { getTransactionAggregate, getTransactionAggregateTable, getTransactions, getTransactionsByDateRange, deleteTransaction, deleteBulkTransactions, updateTransactionCategory, deleteTransactionCascade, updateTransactionType } from '@/lib/api';
+import type { TransactionAggregate, AggregateTableResponse, Transaction } from '@/lib/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import toast from 'react-hot-toast';
+import { useCategories } from '@/contexts/CategoriesContext';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF6B6B'];
 
 export default function Dashboard() {
+  const { categories, getFirstCategoryByType } = useCategories();
   const [data, setData] = useState<TransactionAggregate | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingCategory, setUpdatingCategory] = useState<number | null>(null);
+  const [updatingType, setUpdatingType] = useState<number | null>(null);
   const [filterType, setFilterType] = useState<'all' | 'expense' | 'income' | 'investment' | 'transfer' | 'refund'>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -55,10 +57,7 @@ export default function Dashboard() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [aggregate, categoriesData] = await Promise.all([
-        getTransactionAggregate(),
-        getCategories()
-      ]);
+      const aggregate = await getTransactionAggregate();
       
       console.log('Fetched aggregate:', aggregate);
       // Defensive: ensure categories is an object
@@ -66,7 +65,6 @@ export default function Dashboard() {
         aggregate.categories = {};
       }
       setData(aggregate);
-      setCategories(categoriesData);
 
       let txs: Transaction[];
       if (isDateFiltering && startDate && endDate) {
@@ -253,6 +251,54 @@ export default function Dashboard() {
       });
     } finally {
       setUpdatingCategory(null);
+    }
+  };
+
+  const handleTypeChange = async (transactionId: number, newType: 'expense' | 'income' | 'investment' | 'transfer' | 'refund') => {
+    // For transfers and refunds, we can't change the type this way
+    if (newType === 'transfer' || newType === 'refund') {
+      toast.error('Cannot change type to transfer or refund');
+      return;
+    }
+
+    // Get the first category of the new type
+    const firstCategory = getFirstCategoryByType(newType);
+    if (!firstCategory) {
+      toast.error(`No ${newType} categories available`);
+      return;
+    }
+
+    // Preserve scroll position
+    const scrollPosition = window.scrollY;
+
+    setUpdatingType(transactionId);
+    try {
+      await updateTransactionType(transactionId, newType, firstCategory.id);
+      
+      // Update the transaction in the local state
+      setTransactions(prevTransactions => 
+        prevTransactions.map(tx => 
+          tx.id === transactionId 
+            ? { ...tx, type: newType, category_id: firstCategory.id, category: firstCategory }
+            : tx
+        )
+      );
+      
+      // Restore scroll position after state update
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollPosition);
+      });
+      
+      toast.success(`Transaction type updated to ${newType}`);
+    } catch (error) {
+      console.error('Error updating type:', error);
+      toast.error('Failed to update transaction type');
+      // Restore scroll position even on error
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollPosition);
+      });
+    } finally {
+      setUpdatingType(null);
     }
   };
 
@@ -738,6 +784,25 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <label className="text-sm text-gray-600">Type:</label>
+                    <select
+                      onClick={(e) => e.stopPropagation()}
+                      value={tx.type}
+                      onChange={(e) => handleTypeChange(tx.id, e.target.value as 'expense' | 'income' | 'investment' | 'transfer' | 'refund')}
+                      disabled={updatingType === tx.id || tx.type === 'transfer' || tx.type === 'refund'}
+                      className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                    >
+                      <option value="expense">Expense</option>
+                      <option value="income">Income</option>
+                      <option value="investment">Investment</option>
+                      <option value="transfer" disabled>Transfer</option>
+                      <option value="refund" disabled>Refund</option>
+                    </select>
+                    {updatingType === tx.id && (
+                      <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
                     <label className="text-sm text-gray-600">Category:</label>
                     <select
                       onClick={(e) => e.stopPropagation()}
@@ -859,7 +924,26 @@ export default function Dashboard() {
                       </div>
                     )}
                   </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700 capitalize">{tx.type}</td>
+                  <td className="px-3 py-2 text-sm text-gray-700">
+                    <select
+                      onClick={(e) => e.stopPropagation()}
+                      value={tx.type}
+                      onChange={(e) => handleTypeChange(tx.id, e.target.value as 'expense' | 'income' | 'investment' | 'transfer' | 'refund')}
+                      disabled={updatingType === tx.id || tx.type === 'transfer' || tx.type === 'refund'}
+                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed capitalize"
+                    >
+                      <option value="expense">Expense</option>
+                      <option value="income">Income</option>
+                      <option value="investment">Investment</option>
+                      <option value="transfer" disabled>Transfer</option>
+                      <option value="refund" disabled>Refund</option>
+                    </select>
+                    {updatingType === tx.id && (
+                      <div className="flex items-center justify-center mt-1">
+                        <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                      </div>
+                    )}
+                  </td>
                   <td className={`px-3 py-2 whitespace-nowrap text-sm text-right font-semibold ${
                     tx.type === 'income' ? 'text-green-600' : 
                     tx.type === 'investment' ? 'text-purple-600' :

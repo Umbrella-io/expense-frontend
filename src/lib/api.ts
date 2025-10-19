@@ -121,6 +121,10 @@ export async function updateTransactionCategory(id: number, categoryId: number) 
   return apiPatch<Transaction>(`/api/transactions/${id}/category`, { category_id: categoryId });
 }
 
+export async function updateTransactionType(id: number, type: 'expense' | 'income' | 'investment' | 'transfer' | 'refund', categoryId: number) {
+  return apiPut<Transaction>(`/api/transactions/${id}`, { type, category_id: categoryId });
+}
+
 export async function deleteTransaction(id: number) {
   return apiDelete<{ message: string }>(`/api/transactions/${id}`);
 }
