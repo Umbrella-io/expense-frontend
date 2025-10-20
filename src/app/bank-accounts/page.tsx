@@ -38,10 +38,11 @@ export default function BankAccountsPage() {
     setLoading(true);
     try {
       const data = await getBankAccounts(true);
-      setAccounts(data);
+      setAccounts(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error(e);
       toast.error("Failed to load bank accounts");
+      setAccounts([]); // Ensure accounts is always an array even on error
     } finally {
       setLoading(false);
     }
