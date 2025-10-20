@@ -87,6 +87,22 @@ export interface BulkTransactionError {
   error: string;
 }
 
+export interface BulkTransactionWithDefaultsRequest {
+  bank_account_id: number;
+  default_expense_category_id?: number;
+  default_income_category_id?: number;
+  default_investment_category_id?: number;
+  transactions: Array<{
+    transaction_id?: string;
+    amount: number;
+    type: 'expense' | 'income' | 'investment';
+    category_id?: number;
+    bank_account_id?: number;
+    description?: string;
+    date?: string;
+  }>;
+}
+
 export interface DateRangeParams {
   start_date: string;
   end_date: string;

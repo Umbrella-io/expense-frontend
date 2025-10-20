@@ -1,4 +1,4 @@
-import type { Transaction, Category, TransactionAggregate, CreateTransactionRequest, CreateCategoryRequest, UpdateTransactionRequest, UpdateCategoryRequest, BulkTransactionRequest, BulkTransactionResponse, BulkDeleteRequest, BulkDeleteResponse, AggregateTableResponse, DateRangeParams, HealthData, RefundCreateRequest, RefundUpdateRequest, RefundConvertRequest, RefundGroupResponse, BankAccount } from './types';
+import type { Transaction, Category, TransactionAggregate, CreateTransactionRequest, CreateCategoryRequest, UpdateTransactionRequest, UpdateCategoryRequest, BulkTransactionRequest, BulkTransactionResponse, BulkDeleteRequest, BulkDeleteResponse, AggregateTableResponse, DateRangeParams, HealthData, RefundCreateRequest, RefundUpdateRequest, RefundConvertRequest, RefundGroupResponse, BankAccount, BulkTransactionWithDefaultsRequest } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -155,8 +155,12 @@ export async function createBulkTransactions(data: BulkTransactionRequest) {
   return apiPost<BulkTransactionResponse>('/api/transactions/bulk', data);
 }
 
+export async function createBulkTransactionsWithDefaults(data: BulkTransactionWithDefaultsRequest) {
+  return apiPost<BulkTransactionResponse>('/api/transactions/bulk-with-defaults', data);
+}
+
 export async function deleteBulkTransactions(data: BulkDeleteRequest) {
-  return apiDelete<BulkDeleteResponse>('/api/transactions/bulk', data);
+  return apiPost<BulkDeleteResponse>('/api/transactions/bulk-delete', data);
 }
 
 export async function getTransactionsByDateRange(params: DateRangeParams) {

@@ -22,6 +22,7 @@ export default function Navigation() {
     { href: '/bank-accounts', label: 'Bank Accounts' },
     { href: '/categories', label: 'Categories' },
     { href: '/bulk', label: 'Bulk Upload' },
+    { href: '/bulk-import', label: 'Bulk Import' },
     { href: '/health', label: 'Health' }
   ];
 
