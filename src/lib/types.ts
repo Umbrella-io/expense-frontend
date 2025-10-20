@@ -195,6 +195,15 @@ export interface RefundUpdateRequest extends Partial<Omit<RefundCreateRequest, '
   children: RefundChildInput[]; // replace entire children set atomically
 }
 
+export interface RefundConvertRequest {
+  transaction_id?: string;
+  amount?: number; // if <=0 or omitted = sum(children)
+  bank_account_id?: number; // defaults to original
+  description?: string; // defaults to original
+  date?: string; // ISO string, defaults to now
+  children: RefundChildInput[]; // sum(children) must equal amount
+}
+
 export interface RefundGroupResponse {
   parent: Transaction; // type=refund, parent_transaction_id=null, no category
   children: Transaction[]; // type=refund, parent_transaction_id=parent.id

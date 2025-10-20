@@ -1,4 +1,4 @@
-import type { Transaction, Category, TransactionAggregate, CreateTransactionRequest, CreateCategoryRequest, UpdateTransactionRequest, UpdateCategoryRequest, BulkTransactionRequest, BulkTransactionResponse, BulkDeleteRequest, BulkDeleteResponse, AggregateTableResponse, DateRangeParams, HealthData, RefundCreateRequest, RefundUpdateRequest, RefundGroupResponse, BankAccount } from './types';
+import type { Transaction, Category, TransactionAggregate, CreateTransactionRequest, CreateCategoryRequest, UpdateTransactionRequest, UpdateCategoryRequest, BulkTransactionRequest, BulkTransactionResponse, BulkDeleteRequest, BulkDeleteResponse, AggregateTableResponse, DateRangeParams, HealthData, RefundCreateRequest, RefundUpdateRequest, RefundConvertRequest, RefundGroupResponse, BankAccount } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -187,6 +187,10 @@ export async function createRefund(data: RefundCreateRequest) {
 
 export async function updateRefund(id: number, data: RefundUpdateRequest) {
   return apiPut<RefundGroupResponse>(`/api/refunds/${id}`, data);
+}
+
+export async function convertTransactionToRefund(id: number, data: RefundConvertRequest) {
+  return apiPost<RefundGroupResponse>(`/api/refunds/convert/${id}`, data);
 }
 
 export interface RefundListParams {

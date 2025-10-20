@@ -2,15 +2,17 @@
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
-import { getTransactionAggregate, getTransactionAggregateTable, getTransactions, getTransactionsByDateRange, deleteTransaction, deleteBulkTransactions, updateTransactionCategory, deleteTransactionCascade, updateTransactionType, getBankAccounts, updateTransactionBankAccounts, updateTransaction } from '@/lib/api';
-import type { TransactionAggregate, AggregateTableResponse, Transaction, BankAccount, UpdateTransactionRequest } from '@/lib/types';
+import { getTransactionAggregate, getTransactionAggregateTable, getTransactions, getTransactionsByDateRange, deleteTransaction, deleteBulkTransactions, updateTransactionCategory, deleteTransactionCascade, updateTransactionType, getBankAccounts, updateTransactionBankAccounts, updateTransaction, convertTransactionToRefund } from '@/lib/api';
+import type { TransactionAggregate, AggregateTableResponse, Transaction, BankAccount, UpdateTransactionRequest, RefundChildInput } from '@/lib/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import toast from 'react-hot-toast';
 import { useCategories } from '@/contexts/CategoriesContext';
+import { useRouter } from 'next/navigation';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF6B6B'];
 
 export default function Dashboard() {
+  const router = useRouter();
   const { categories, getFirstCategoryByType } = useCategories();
   const [data, setData] = useState<TransactionAggregate | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -19,6 +21,8 @@ export default function Dashboard() {
   const [updatingCategory, setUpdatingCategory] = useState<number | null>(null);
   const [updatingType, setUpdatingType] = useState<number | null>(null);
   const [updatingBankAccount, setUpdatingBankAccount] = useState<number | null>(null);
+  const [convertingToRefund, setConvertingToRefund] = useState<number | null>(null);
+  const [convertingFromRefund, setConvertingFromRefund] = useState<number | null>(null);
   const [filterType, setFilterType] = useState<'all' | 'expense' | 'income' | 'investment' | 'transfer' | 'refund'>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -372,6 +376,122 @@ export default function Dashboard() {
       });
     } finally {
       setUpdatingBankAccount(null);
+    }
+  };
+
+  const handleConvertToRefund = async (transaction: Transaction) => {
+    // Can only convert transactions without a parent
+    if (transaction.type === 'refund') {
+      toast.error('Cannot convert refunds to refunds');
+      return;
+    }
+    
+    if (transaction.parent_transaction_id != null) {
+      toast.error('Cannot convert transactions with a parent (child transactions)');
+      return;
+    }
+
+    // Get first expense category for the breakdown
+    const expenseCategories = categories.filter(cat => cat.type === 'expense');
+    if (expenseCategories.length === 0) {
+      toast.error('No expense categories available');
+      return;
+    }
+
+    const firstExpenseCategory = expenseCategories.sort((a, b) => a.id - b.id)[0];
+
+    setConvertingToRefund(transaction.id);
+    try {
+      const refundGroup = await convertTransactionToRefund(transaction.id, {
+        children: [
+          {
+            amount: transaction.amount,
+            category_id: firstExpenseCategory.id,
+            description: transaction.description || 'Refund item'
+          }
+        ]
+      });
+      
+      toast.success('Transaction converted to refund! Redirecting to edit...');
+      // Redirect to refunds page with edit parameter
+      router.push(`/refunds?edit=${refundGroup.parent.id}`);
+    } catch (error) {
+      console.error('Error converting to refund:', error);
+      toast.error('Failed to convert transaction to refund');
+      setConvertingToRefund(null);
+    }
+  };
+
+  const handleConvertFromRefund = async (transaction: Transaction, targetType: 'expense' | 'income' | 'investment' | 'transfer') => {
+    // Can only convert refund parents
+    if (transaction.type !== 'refund') {
+      toast.error('Can only convert refund parents');
+      return;
+    }
+    
+    if (transaction.parent_transaction_id != null) {
+      toast.error('Cannot convert refund children');
+      return;
+    }
+
+    // Preserve scroll position
+    const scrollPosition = window.scrollY;
+
+    setConvertingFromRefund(transaction.id);
+    try {
+      let payload: UpdateTransactionRequest;
+      
+      if (targetType === 'transfer') {
+        // For transfer, need destination bank account
+        const otherBank = bankAccounts.find(acc => acc.id !== transaction.bank_account_id);
+        if (!otherBank) {
+          toast.error('Need at least 2 bank accounts for transfer');
+          setConvertingFromRefund(null);
+          return;
+        }
+        payload = {
+          type: 'transfer',
+          destination_bank_account_id: otherBank.id
+        };
+      } else {
+        // For expense/income/investment, need matching category
+        const firstCategory = getFirstCategoryByType(targetType);
+        if (!firstCategory) {
+          toast.error(`No ${targetType} categories available`);
+          setConvertingFromRefund(null);
+          return;
+        }
+        payload = {
+          type: targetType,
+          category_id: firstCategory.id
+        };
+      }
+      
+      const updatedTx = await updateTransaction(transaction.id, payload);
+      
+      // Update the transaction in the local state
+      setTransactions(prevTransactions => 
+        prevTransactions.map(tx => 
+          tx.id === transaction.id ? updatedTx : tx
+        )
+      );
+      
+      // Restore scroll position after state update
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollPosition);
+      });
+      
+      toast.success(`Refund converted to ${targetType}! Children deleted.`);
+      fetchData(); // Refresh to remove deleted children
+    } catch (error) {
+      console.error('Error converting from refund:', error);
+      toast.error('Failed to convert refund');
+      // Restore scroll position even on error
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollPosition);
+      });
+    } finally {
+      setConvertingFromRefund(null);
     }
   };
 
@@ -846,6 +966,16 @@ export default function Dashboard() {
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">{new Date(tx.date).toLocaleDateString()}</span>
                     <div className="flex items-center gap-3">
+                      {/* Convert to Refund button - all types except refunds and child transactions */}
+                      {tx.type !== 'refund' && tx.parent_transaction_id == null && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleConvertToRefund(tx); }}
+                          disabled={convertingToRefund === tx.id}
+                          className="text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
+                        >
+                          {convertingToRefund === tx.id ? '...' : 'Convert'}
+                        </button>
+                      )}
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(tx); }}
                         className={`text-red-600 hover:text-red-800 font-medium ${
@@ -875,6 +1005,34 @@ export default function Dashboard() {
                       <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
                     )}
                   </div>
+                  
+                  {/* Convert From Refund - only for refund parents */}
+                  {tx.type === 'refund' && tx.parent_transaction_id == null && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-gray-600">Convert to:</label>
+                      <select
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value) {
+                            handleConvertFromRefund(tx, value as 'expense' | 'income' | 'investment' | 'transfer');
+                            e.target.value = '';  // Reset selection
+                          }
+                        }}
+                        disabled={convertingFromRefund === tx.id}
+                        className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                      >
+                        <option value="">Select type...</option>
+                        <option value="expense">Expense</option>
+                        <option value="income">Income</option>
+                        <option value="investment">Investment</option>
+                        <option value="transfer">Transfer</option>
+                      </select>
+                      {convertingFromRefund === tx.id && (
+                        <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                      )}
+                    </div>
+                  )}
                   <div className="flex items-center gap-2">
                     <label className="text-sm text-gray-600">Category:</label>
                     <select
@@ -1134,6 +1292,35 @@ export default function Dashboard() {
                         <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
                       </div>
                     )}
+                    {/* Convert From Refund - only for refund parents */}
+                    {tx.type === 'refund' && tx.parent_transaction_id == null && (
+                      <>
+                        <div className="text-xs text-gray-500 mt-2 mb-1">Convert to:</div>
+                        <select
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value) {
+                              handleConvertFromRefund(tx, value as 'expense' | 'income' | 'investment' | 'transfer');
+                              e.target.value = '';  // Reset selection
+                            }
+                          }}
+                          disabled={convertingFromRefund === tx.id}
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <option value="">Select...</option>
+                          <option value="expense">Expense</option>
+                          <option value="income">Income</option>
+                          <option value="investment">Investment</option>
+                          <option value="transfer">Transfer</option>
+                        </select>
+                        {convertingFromRefund === tx.id && (
+                          <div className="flex items-center justify-center mt-1">
+                            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </td>
                   <td className={`px-3 py-2 whitespace-nowrap text-sm text-right font-semibold ${
                     tx.type === 'income' ? 'text-green-600' : 
@@ -1143,6 +1330,17 @@ export default function Dashboard() {
                   }`}>{formatCurrency(tx.amount)}</td>
                   <td className="px-3 py-2 whitespace-nowrap text-sm text-center">
                     <div className="inline-flex items-center gap-2">
+                      {/* Convert to Refund button - all types except refunds and child transactions */}
+                      {tx.type !== 'refund' && tx.parent_transaction_id == null && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleConvertToRefund(tx); }}
+                          disabled={convertingToRefund === tx.id}
+                          className="text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
+                          title="Convert to refund"
+                        >
+                          {convertingToRefund === tx.id ? '...' : 'Convert'}
+                        </button>
+                      )}
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(tx); }}
                         className="text-red-600 hover:text-red-800 font-medium"

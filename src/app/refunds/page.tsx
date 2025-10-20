@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import {
   getCategories,
@@ -15,6 +16,9 @@ import type { Category, RefundChildInput, RefundCreateRequest, RefundGroupRespon
 import LoadingSpinner from '@/components/LoadingSpinner';
 
 export default function RefundsPage() {
+  const searchParams = useSearchParams();
+  const editParam = searchParams.get('edit');
+  
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -75,6 +79,39 @@ export default function RefundsPage() {
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-load refund in edit mode if edit parameter is present
+  useEffect(() => {
+    if (editParam && refunds && refunds.length > 0) {
+      const refundId = Number(editParam);
+      const refundToEdit = refunds.find(r => r.parent.id === refundId);
+      if (refundToEdit && editingId !== refundId) {
+        console.log('Auto-loading refund in edit mode:', refundId);
+        setEditingId(refundToEdit.parent.id);
+        reset({
+          transaction_id: refundToEdit.parent.transaction_id,
+          amount: refundToEdit.total_amount,
+          bank_account_id: Number(refundToEdit.parent.bank_account_id),
+          description: refundToEdit.parent.description,
+          date: refundToEdit.parent.date?.split('T')[0],
+        });
+        setChildren(
+          refundToEdit.children.map((c) => ({
+            transaction_id: c.transaction_id,
+            amount: c.amount,
+            category_id: c.category_id || 0,
+            description: c.description,
+            date: c.date?.split('T')[0],
+          }))
+        );
+        // Scroll to the form
+        setTimeout(() => {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 200);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editParam, refunds]);
 
   const addChild = () => {
     setChildren((prev) => [...prev, { amount: 0, category_id: 0, description: '' }]);
