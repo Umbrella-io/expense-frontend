@@ -2,8 +2,8 @@
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
-import { getTransactionAggregate, getTransactionAggregateTable, getTransactions, getTransactionsByDateRange, deleteTransaction, deleteBulkTransactions, updateTransactionCategory, deleteTransactionCascade, updateTransactionType, getBankAccounts, updateTransactionBankAccounts } from '@/lib/api';
-import type { TransactionAggregate, AggregateTableResponse, Transaction, BankAccount } from '@/lib/types';
+import { getTransactionAggregate, getTransactionAggregateTable, getTransactions, getTransactionsByDateRange, deleteTransaction, deleteBulkTransactions, updateTransactionCategory, deleteTransactionCascade, updateTransactionType, getBankAccounts, updateTransactionBankAccounts, updateTransaction } from '@/lib/api';
+import type { TransactionAggregate, AggregateTableResponse, Transaction, BankAccount, UpdateTransactionRequest } from '@/lib/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import toast from 'react-hot-toast';
 import { useCategories } from '@/contexts/CategoriesContext';
@@ -261,9 +261,9 @@ export default function Dashboard() {
   };
 
   const handleTypeChange = async (transactionId: number, newType: 'expense' | 'income' | 'investment' | 'transfer' | 'refund') => {
-    // For transfers and refunds, we can't change the type this way
+    // Can't change TO transfer or refund via dropdown
     if (newType === 'transfer' || newType === 'refund') {
-      toast.error('Cannot change type to transfer or refund');
+      toast.error('Cannot change type to transfer or refund using this dropdown');
       return;
     }
 
@@ -279,14 +279,18 @@ export default function Dashboard() {
 
     setUpdatingType(transactionId);
     try {
-      await updateTransactionType(transactionId, newType, firstCategory.id);
+      // Update type and category - don't send destination_bank_account_id at all
+      const payload: UpdateTransactionRequest = {
+        type: newType,
+        category_id: firstCategory.id
+      };
+      
+      const updatedTx = await updateTransaction(transactionId, payload);
       
       // Update the transaction in the local state
       setTransactions(prevTransactions => 
         prevTransactions.map(tx => 
-          tx.id === transactionId 
-            ? { ...tx, type: newType, category_id: firstCategory.id, category: firstCategory }
-            : tx
+          tx.id === transactionId ? updatedTx : tx
         )
       );
       
@@ -858,7 +862,7 @@ export default function Dashboard() {
                       onClick={(e) => e.stopPropagation()}
                       value={tx.type}
                       onChange={(e) => handleTypeChange(tx.id, e.target.value as 'expense' | 'income' | 'investment' | 'transfer' | 'refund')}
-                      disabled={updatingType === tx.id || tx.type === 'transfer' || tx.type === 'refund'}
+                      disabled={updatingType === tx.id || tx.type === 'refund'}
                       className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                     >
                       <option value="expense">Expense</option>
@@ -1116,7 +1120,7 @@ export default function Dashboard() {
                       onClick={(e) => e.stopPropagation()}
                       value={tx.type}
                       onChange={(e) => handleTypeChange(tx.id, e.target.value as 'expense' | 'income' | 'investment' | 'transfer' | 'refund')}
-                      disabled={updatingType === tx.id || tx.type === 'transfer' || tx.type === 'refund'}
+                      disabled={updatingType === tx.id || tx.type === 'refund'}
                       className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed capitalize"
                     >
                       <option value="expense">Expense</option>
