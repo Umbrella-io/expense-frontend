@@ -2,8 +2,8 @@
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
-import { getTransactionAggregate, getTransactionAggregateTable, getTransactions, getTransactionsByDateRange, deleteTransaction, deleteBulkTransactions, updateTransactionCategory, deleteTransactionCascade, updateTransactionType, getBankAccounts, updateTransactionBankAccounts, updateTransaction, convertTransactionToRefund } from '@/lib/api';
-import type { TransactionAggregate, AggregateTableResponse, Transaction, BankAccount, UpdateTransactionRequest, RefundChildInput } from '@/lib/types';
+import { getTransactionAggregate, getTransactionAggregateTable, getTransactions, getTransactionsByDateRange, deleteTransaction, deleteBulkTransactions, updateTransactionCategory, deleteTransactionCascade, getBankAccounts, updateTransactionBankAccounts, updateTransaction, convertTransactionToRefund } from '@/lib/api';
+import type { TransactionAggregate, AggregateTableResponse, Transaction, BankAccount, UpdateTransactionRequest } from '@/lib/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import toast from 'react-hot-toast';
 import { useCategories } from '@/contexts/CategoriesContext';
@@ -126,10 +126,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterType, isDateFiltering, startDate, endDate]);
 
   useEffect(() => {
     fetchAggregateTable();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aggregateTableStartDate, aggregateTableEndDate]);
 
   const handleDeleteTransaction = async (tx: Transaction) => {

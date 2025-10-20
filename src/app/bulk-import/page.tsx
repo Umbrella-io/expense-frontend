@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import Link from "next/link";
 import toast from "react-hot-toast";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import {
@@ -91,12 +92,14 @@ export default function BulkImportPage() {
       } else {
         toast.success(`Imported ${response.success_count} transactions, ${response.failed_count} failed`);
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
       if (e instanceof SyntaxError) {
         toast.error("Invalid JSON format");
-      } else {
+      } else if (e instanceof Error) {
         toast.error(e.message || "Failed to import transactions");
+      } else {
+        toast.error("Failed to import transactions");
       }
     } finally {
       setSubmitting(false);
@@ -196,7 +199,7 @@ export default function BulkImportPage() {
             />
             {errors.json_input && <p className="mt-1 text-sm text-red-600">{errors.json_input.message as string}</p>}
             <p className="mt-2 text-sm text-gray-500">
-              Paste your JSON with a "transactions" array. Each transaction needs: amount, type (expense/income/investment), and optional description, date, transaction_id, category_id, bank_account_id.
+              Paste your JSON with a &quot;transactions&quot; array. Each transaction needs: amount, type (expense/income/investment), and optional description, date, transaction_id, category_id, bank_account_id.
             </p>
           </div>
 
@@ -268,7 +271,7 @@ export default function BulkImportPage() {
                 Successfully Imported ({results.success_count})
               </h3>
               <div className="text-sm text-gray-600">
-                View imported transactions on the <a href="/" className="text-blue-600 hover:underline">dashboard</a>.
+                View imported transactions on the <Link href="/" className="text-blue-600 hover:underline">dashboard</Link>.
               </div>
             </div>
           )}

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
 import { createBulkTransactions, getCategories, getBankAccounts } from '@/lib/api';
-import type { CreateTransactionRequest, Category, BulkTransactionRequest, BankAccount } from '@/lib/types';
+import type { Category, BulkTransactionRequest, BankAccount } from '@/lib/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import toast from 'react-hot-toast';
 
