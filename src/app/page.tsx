@@ -24,6 +24,7 @@ export default function Dashboard() {
   const [convertingToRefund, setConvertingToRefund] = useState<number | null>(null);
   const [convertingFromRefund, setConvertingFromRefund] = useState<number | null>(null);
   const [filterType, setFilterType] = useState<'all' | 'expense' | 'income' | 'investment' | 'transfer' | 'refund'>('all');
+  const [filterBankId, setFilterBankId] = useState<number | 'all'>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isDateFiltering, setIsDateFiltering] = useState(false);
@@ -35,8 +36,10 @@ export default function Dashboard() {
 
   // Grouping for refund parent/children
   const visibleTransactions = useMemo(() =>
-    transactions.filter(tx => !(tx.type === 'refund' && tx.parent_transaction_id != null)),
-    [transactions]
+    transactions
+      .filter(tx => !(tx.type === 'refund' && tx.parent_transaction_id != null))
+      .filter(tx => filterBankId === 'all' ? true : tx.bank_account_id === filterBankId),
+    [transactions, filterBankId]
   );
 
   const refundChildrenByParent = useMemo(() => {
@@ -866,6 +869,24 @@ export default function Dashboard() {
                 <option value="investment">Investment</option>
                 <option value="transfer">Transfer</option>
                 <option value="refund">Refund</option>
+              </select>
+            </div>
+
+            {/* Source Bank Filter */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Source Bank:</label>
+              <select
+                value={filterBankId}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFilterBankId(val === 'all' ? 'all' : Number(val));
+                }}
+                className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1 md:flex-initial"
+              >
+                <option value="all">All</option>
+                {bankAccounts.map((ba) => (
+                  <option key={ba.id} value={ba.id}>{ba.name}</option>
+                ))}
               </select>
             </div>
 
