@@ -978,6 +978,7 @@ export default function Dashboard() {
                       <div className={`font-semibold ${
                         tx.type === 'income' ? 'text-green-600' : 
                         tx.type === 'investment' ? 'text-purple-600' : 
+                        tx.type === 'transfer' ? 'text-yellow-600' :
                         tx.type === 'refund' ? 'text-teal-600' :
                         'text-red-600'
                       }`}>
@@ -1348,6 +1349,7 @@ export default function Dashboard() {
                   <td className={`px-3 py-2 whitespace-nowrap text-sm text-right font-semibold ${
                     tx.type === 'income' ? 'text-green-600' : 
                     tx.type === 'investment' ? 'text-purple-600' :
+                    tx.type === 'transfer' ? 'text-yellow-600' :
                     tx.type === 'refund' ? 'text-teal-600' :
                     'text-red-600'
                   }`}>{formatCurrency(tx.amount)}</td>
