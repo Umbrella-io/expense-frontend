@@ -38,7 +38,14 @@ export default function Dashboard() {
   const visibleTransactions = useMemo(() =>
     transactions
       .filter(tx => !(tx.type === 'refund' && tx.parent_transaction_id != null))
-      .filter(tx => filterBankId === 'all' ? true : tx.bank_account_id === filterBankId),
+      .filter(tx => filterBankId === 'all' ? true : tx.bank_account_id === filterBankId)
+      .slice()
+      .sort((a, b) => {
+        const ad = new Date(a.date).getTime();
+        const bd = new Date(b.date).getTime();
+        if (bd !== ad) return bd - ad; // newest first
+        return (b.id || 0) - (a.id || 0);
+      }),
     [transactions, filterBankId]
   );
 
@@ -408,11 +415,13 @@ export default function Dashboard() {
     setConvertingToRefund(transaction.id);
     try {
       const refundGroup = await convertTransactionToRefund(transaction.id, {
+        date: transaction.date,
         children: [
           {
             amount: transaction.amount,
             category_id: firstExpenseCategory.id,
-            description: transaction.description || 'Refund item'
+            description: transaction.description || 'Refund item',
+            date: transaction.date
           }
         ]
       });
