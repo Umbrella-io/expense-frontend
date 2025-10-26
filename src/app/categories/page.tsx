@@ -38,12 +38,6 @@ export default function Categories() {
   const onSubmit = async (data: CreateCategoryRequest) => {
     setLoading(true);
     try {
-      // Check if trying to create investment category
-      if (data.type === 'investment') {
-        toast.error('Investment categories are not yet supported by the backend. Please update the backend API to support investment type.');
-        return;
-      }
-
       await createCategory(data);
       toast.success('Category added successfully!');
       reset();
