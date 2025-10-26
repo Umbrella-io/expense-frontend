@@ -33,6 +33,8 @@ export default function Dashboard() {
   const [aggregateTableData, setAggregateTableData] = useState<AggregateTableResponse | null>(null);
   const [aggregateTableStartDate, setAggregateTableStartDate] = useState('');
   const [aggregateTableEndDate, setAggregateTableEndDate] = useState('');
+  const [filtersHydrated, setFiltersHydrated] = useState(false);
+  const [sortMode, setSortMode] = useState<'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc'>('date_desc');
 
   // Grouping for refund parent/children
   const visibleTransactions = useMemo(() =>
@@ -41,12 +43,26 @@ export default function Dashboard() {
       .filter(tx => filterBankId === 'all' ? true : tx.bank_account_id === filterBankId)
       .slice()
       .sort((a, b) => {
-        const ad = new Date(a.date).getTime();
-        const bd = new Date(b.date).getTime();
-        if (bd !== ad) return bd - ad; // newest first
-        return (b.id || 0) - (a.id || 0);
+        if (sortMode === 'amount_desc' || sortMode === 'amount_asc') {
+          const cmp = (a.amount || 0) - (b.amount || 0);
+          if (cmp !== 0) return sortMode === 'amount_desc' ? -cmp : cmp;
+          // tie-breaker by date desc
+          const ad = new Date(a.date).getTime();
+          const bd = new Date(b.date).getTime();
+          if (bd !== ad) return bd - ad;
+          return (b.id || 0) - (a.id || 0);
+        } else {
+          // date sort
+          const ad = new Date(a.date).getTime();
+          const bd = new Date(b.date).getTime();
+          if (ad !== bd) return sortMode === 'date_desc' ? (bd - ad) : (ad - bd);
+          // tie-breaker by amount desc
+          const cmp = (b.amount || 0) - (a.amount || 0);
+          if (cmp !== 0) return cmp;
+          return (b.id || 0) - (a.id || 0);
+        }
       }),
-    [transactions, filterBankId]
+    [transactions, filterBankId, sortMode]
   );
 
   const refundChildrenByParent = useMemo(() => {
@@ -134,10 +150,56 @@ export default function Dashboard() {
     setAggregateTableEndDate(formatDate(currentDate));
   }, []);
 
+  // Hydrate filters from localStorage on mount
   useEffect(() => {
+    try {
+      const raw = typeof window !== 'undefined' ? localStorage.getItem('dashboard.filters') : null;
+      if (raw) {
+        const saved = JSON.parse(raw) as {
+          filterType?: 'all' | 'expense' | 'income' | 'investment' | 'transfer' | 'refund';
+          filterBankId?: number | 'all';
+          startDate?: string;
+          endDate?: string;
+          isDateFiltering?: boolean;
+          sortMode?: 'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc';
+        };
+        if (saved.filterType) setFilterType(saved.filterType);
+        if (saved.filterBankId !== undefined) setFilterBankId(saved.filterBankId);
+        if (saved.startDate) setStartDate(saved.startDate);
+        if (saved.endDate) setEndDate(saved.endDate);
+        if (typeof saved.isDateFiltering === 'boolean') setIsDateFiltering(saved.isDateFiltering);
+        if (saved.sortMode) setSortMode(saved.sortMode);
+      }
+    } catch (e) {
+      console.warn('Failed to hydrate dashboard filters', e);
+    } finally {
+      setFiltersHydrated(true);
+    }
+  }, []);
+
+  // Persist filters to localStorage when they change
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const payload = {
+      filterType,
+      filterBankId,
+      startDate,
+      endDate,
+      isDateFiltering,
+      sortMode,
+    };
+    try {
+      localStorage.setItem('dashboard.filters', JSON.stringify(payload));
+    } catch (e) {
+      console.warn('Failed to persist dashboard filters', e);
+    }
+  }, [filterType, filterBankId, startDate, endDate, isDateFiltering, sortMode]);
+
+  useEffect(() => {
+    if (!filtersHydrated) return;
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterType, isDateFiltering, startDate, endDate]);
+  }, [filterType, isDateFiltering, startDate, endDate, filtersHydrated]);
 
   useEffect(() => {
     fetchAggregateTable();
@@ -896,6 +958,21 @@ export default function Dashboard() {
                 {bankAccounts.map((ba) => (
                   <option key={ba.id} value={ba.id}>{ba.name}</option>
                 ))}
+              </select>
+            </div>
+
+            {/* Sort Filter */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Sort:</label>
+              <select
+                value={sortMode}
+                onChange={(e) => setSortMode(e.target.value as 'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc')}
+                className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1 md:flex-initial"
+              >
+                <option value="date_desc">Date: Newest first</option>
+                <option value="date_asc">Date: Oldest first</option>
+                <option value="amount_desc">Amount: High to Low</option>
+                <option value="amount_asc">Amount: Low to High</option>
               </select>
             </div>
 
