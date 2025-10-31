@@ -488,9 +488,10 @@ export default function Dashboard() {
         ]
       });
       
-      toast.success('Transaction converted to refund! Redirecting to edit...');
-      // Redirect to refunds page with edit parameter
-      router.push(`/refunds?edit=${refundGroup.parent.id}`);
+      toast.success('Transaction converted to refund!');
+      // Stay on the dashboard; no redirect
+      await fetchData();
+      setConvertingToRefund(null);
     } catch (error) {
       console.error('Error converting to refund:', error);
       toast.error('Failed to convert transaction to refund');
