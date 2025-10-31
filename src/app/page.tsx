@@ -489,8 +489,17 @@ export default function Dashboard() {
       });
       
       toast.success('Transaction converted to refund!');
-      // Stay on the dashboard; no redirect
-      await fetchData();
+      // Stay on the dashboard; update local state without refetch
+      const refundChildren = Array.isArray(refundGroup.children) ? refundGroup.children : [];
+      setTransactions(prev => {
+        const filtered = prev.filter(tx => tx.id !== transaction.id);
+        return [...filtered, refundGroup.parent, ...refundChildren];
+      });
+      setExpandedRefundParents(prev => {
+        const next = new Set(prev);
+        next.add(refundGroup.parent.id);
+        return next;
+      });
       setConvertingToRefund(null);
     } catch (error) {
       console.error('Error converting to refund:', error);
