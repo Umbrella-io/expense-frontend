@@ -18,13 +18,23 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 export default function RefundsPage() {
   const searchParams = useSearchParams();
   const editParam = searchParams.get('edit');
-  
+  type RefundDraft = {
+    transaction_id?: string;
+    amount: number;
+    bank_account_id: number;
+    description?: string;
+    date?: string;
+    children: RefundChildInput[];
+  };
+
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [refunds, setRefunds] = useState<RefundGroupResponse[] | null>(null);
-  const [editingId, setEditingId] = useState<number | null>(null);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [refundDrafts, setRefundDrafts] = useState<Record<number, RefundDraft>>({});
+  const [savingRefundIds, setSavingRefundIds] = useState<Record<number, boolean>>({});
+  const [highlightId, setHighlightId] = useState<number | null>(null);
 
   // Parent form
   const {
@@ -41,6 +51,27 @@ export default function RefundsPage() {
   const [children, setChildren] = useState<RefundChildInput[]>([
     { amount: 0, category_id: 0, description: '' },
   ]);
+
+  function getGroupDraft(group: RefundGroupResponse): RefundDraft {
+    return {
+      transaction_id: group.parent.transaction_id || undefined,
+      amount: group.total_amount,
+      bank_account_id: Number(group.parent.bank_account_id),
+      description: group.parent.description || '',
+      date: group.parent.date?.split('T')[0],
+      children: (group.children ?? []).map((c) => ({
+        transaction_id: c.transaction_id || undefined,
+        amount: c.amount,
+        category_id: c.category_id || 0,
+        description: c.description || '',
+        date: c.date?.split('T')[0],
+      })),
+    };
+  }
+
+  function getDraftForGroup(group: RefundGroupResponse): RefundDraft {
+    return refundDrafts[group.parent.id] ?? getGroupDraft(group);
+  }
 
   const expenseCategories = useMemo(
     () => categories.filter((c) => c.type === 'expense'),
@@ -86,38 +117,27 @@ export default function RefundsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-load refund in edit mode if edit parameter is present
   useEffect(() => {
-    if (editParam && refunds && refunds.length > 0) {
+    if (!refunds) return;
+    setRefundDrafts((prev) => {
+      const next: Record<number, RefundDraft> = {};
+      refunds.forEach((group) => {
+        next[group.parent.id] = prev[group.parent.id] ?? getGroupDraft(group);
+      });
+      return next;
+    });
+  }, [refunds]);
+
+  // Auto-highlight refund via edit param
+  useEffect(() => {
+    if (editParam) {
       const refundId = Number(editParam);
-      const refundToEdit = refunds.find(r => r.parent.id === refundId);
-      if (refundToEdit && editingId !== refundId) {
-        console.log('Auto-loading refund in edit mode:', refundId);
-        setEditingId(refundToEdit.parent.id);
-        reset({
-          transaction_id: refundToEdit.parent.transaction_id,
-          amount: refundToEdit.total_amount,
-          bank_account_id: Number(refundToEdit.parent.bank_account_id),
-          description: refundToEdit.parent.description,
-          date: refundToEdit.parent.date?.split('T')[0],
-        });
-        setChildren(
-          (refundToEdit.children ?? []).map((c) => ({
-            transaction_id: c.transaction_id,
-            amount: c.amount,
-            category_id: c.category_id || 0,
-            description: c.description,
-            date: c.date?.split('T')[0],
-          }))
-        );
-        // Scroll to the form
-        setTimeout(() => {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }, 200);
+      if (!Number.isNaN(refundId)) {
+        setHighlightId(refundId);
+        setTimeout(() => setHighlightId(null), 4000);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editParam, refunds]);
+  }, [editParam]);
 
   const addChild = () => {
     setChildren((prev) => [...prev, { amount: 0, category_id: 0, description: '' }]);
@@ -158,17 +178,11 @@ export default function RefundsPage() {
 
     setSubmitting(true);
     try {
-      if (editingId) {
-        await updateRefund(editingId, { ...payload });
-        toast.success('Refund updated');
-      } else {
-        await createRefund(payload);
-        toast.success('Refund created');
-      }
+      await createRefund(payload);
+      toast.success('Refund created');
       // reset form
       reset({ transaction_id: '', amount: 0, bank_account_id: 1, description: '', date: new Date().toISOString().split('T')[0] });
       setChildren([{ amount: 0, category_id: 0, description: '' }]);
-      setEditingId(null);
       await loadAll();
     } catch (e) {
       console.error(e);
@@ -178,24 +192,114 @@ export default function RefundsPage() {
     }
   };
 
-  const handleEdit = (group: RefundGroupResponse) => {
-    setEditingId(group.parent.id);
-    reset({
-      transaction_id: group.parent.transaction_id,
-      amount: group.total_amount,
-      bank_account_id: Number(group.parent.bank_account_id),
-      description: group.parent.description,
-      date: group.parent.date?.split('T')[0],
+  const updateGroupDraft = (group: RefundGroupResponse, patch: Partial<RefundDraft>) => {
+    setRefundDrafts((prev) => {
+      const base = prev[group.parent.id] ?? getGroupDraft(group);
+      return {
+        ...prev,
+        [group.parent.id]: {
+          ...base,
+          ...patch,
+        },
+      };
     });
-    setChildren(
-      (group.children ?? []).map((c) => ({
-        transaction_id: c.transaction_id,
-        amount: c.amount,
-        category_id: c.category_id || 0,
-        description: c.description,
-        date: c.date?.split('T')[0],
-      }))
-    );
+  };
+
+  const updateDraftChild = (group: RefundGroupResponse, index: number, patch: Partial<RefundChildInput>) => {
+    setRefundDrafts((prev) => {
+      const base = prev[group.parent.id] ?? getGroupDraft(group);
+      const nextChildren = base.children.map((child, idx) => (idx === index ? { ...child, ...patch } : child));
+      return {
+        ...prev,
+        [group.parent.id]: {
+          ...base,
+          children: nextChildren,
+        },
+      };
+    });
+  };
+
+  const addDraftChild = (group: RefundGroupResponse) => {
+    setRefundDrafts((prev) => {
+      const base = prev[group.parent.id] ?? getGroupDraft(group);
+      return {
+        ...prev,
+        [group.parent.id]: {
+          ...base,
+          children: [...base.children, { amount: 0, category_id: 0, description: '' }],
+        },
+      };
+    });
+  };
+
+  const removeDraftChild = (group: RefundGroupResponse, index: number) => {
+    setRefundDrafts((prev) => {
+      const base = prev[group.parent.id] ?? getGroupDraft(group);
+      const nextChildren = base.children.filter((_, idx) => idx !== index);
+      return {
+        ...prev,
+        [group.parent.id]: {
+          ...base,
+          children: nextChildren.length > 0 ? nextChildren : [{ amount: 0, category_id: 0, description: '' }],
+        },
+      };
+    });
+  };
+
+  const getDraftChildrenSum = (group: RefundGroupResponse) => {
+    const draft = refundDrafts[group.parent.id] ?? getGroupDraft(group);
+    return draft.children.reduce((sum, child) => sum + Number(child.amount || 0), 0);
+  };
+
+  const getDraftRemaining = (group: RefundGroupResponse) => {
+    const draft = refundDrafts[group.parent.id] ?? getGroupDraft(group);
+    return Number(draft.amount || 0) - getDraftChildrenSum(group);
+  };
+
+  const resetDraftForGroup = (group: RefundGroupResponse) => {
+    setRefundDrafts((prev) => ({
+      ...prev,
+      [group.parent.id]: getGroupDraft(group),
+    }));
+  };
+
+  const handleSaveGroup = async (group: RefundGroupResponse) => {
+    const draft = refundDrafts[group.parent.id] ?? getGroupDraft(group);
+    const remaining = Number(draft.amount || 0) - draft.children.reduce((sum, c) => sum + Number(c.amount || 0), 0);
+    if (draft.children.length === 0) {
+      toast.error('Add at least one refund item');
+      return;
+    }
+    if (remaining !== 0) {
+      toast.error('Children sum must equal the parent amount');
+      return;
+    }
+    const payload: RefundCreateRequest = {
+      transaction_id: draft.transaction_id,
+      amount: Number(draft.amount),
+      bank_account_id: Number(draft.bank_account_id),
+      description: draft.description,
+      date: draft.date ? new Date(draft.date).toISOString() : undefined,
+      children: draft.children.map((child) => ({
+        transaction_id: child.transaction_id,
+        amount: Number(child.amount),
+        category_id: Number(child.category_id),
+        description: child.description,
+        date: child.date ? new Date(child.date).toISOString() : undefined,
+      })),
+    };
+
+    setSavingRefundIds((prev) => ({ ...prev, [group.parent.id]: true }));
+    try {
+      await updateRefund(group.parent.id, payload);
+      toast.success('Refund updated');
+      await loadAll();
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to update refund');
+    } finally {
+      setSavingRefundIds((prev) => ({ ...prev, [group.parent.id]: false }));
+    }
   };
 
   const handleDeleteGroup = async (group: RefundGroupResponse) => {
@@ -225,9 +329,9 @@ export default function RefundsPage() {
         <p className="text-gray-600">Create and manage refunds that offset your expenses</p>
       </div>
 
-      {/* Create / Edit Refund */}
+      {/* Create Refund */}
       <div className="bg-white p-6 rounded-lg shadow-sm border mb-8">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">{editingId ? 'Edit Refund' : 'Create Refund'}</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Create Refund</h2>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           {/* Parent details */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -333,22 +437,9 @@ export default function RefundsPage() {
             </div>
           </div>
 
-          <div className="flex gap-3 pt-4">
-            {editingId && (
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingId(null);
-                  reset({ transaction_id: '', amount: 0, bank_account_id: 1, description: '', date: new Date().toISOString().split('T')[0] });
-                  setChildren([{ amount: 0, category_id: 0, description: '' }]);
-                }}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-              >
-                Cancel Edit
-              </button>
-            )}
+          <div className="flex justify-end pt-4">
             <button type="submit" disabled={submitting} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50">
-              {submitting ? <LoadingSpinner /> : editingId ? 'Update Refund' : 'Create Refund'}
+              {submitting ? 'Creating…' : 'Create Refund'}
             </button>
           </div>
         </form>
@@ -362,41 +453,202 @@ export default function RefundsPage() {
         {!refunds || refunds.length === 0 ? (
           <div className="text-gray-500 text-center py-8">No refunds found.</div>
         ) : (
-          <div className="space-y-3">
-            {refunds.map((g) => (
-              <div key={g.parent.id} className="border rounded-lg p-4 bg-gray-50">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-semibold text-gray-900">{g.parent.description || 'No description'}</div>
-                    <div className="text-sm text-gray-600 flex gap-3 flex-wrap">
-                      <span className="font-mono">{g.parent.transaction_id || '-'}</span>
-                      <span>{new Date(g.parent.date).toLocaleDateString()}</span>
-                      <span className="text-teal-700">Amount: {g.total_amount}</span>
-                      <span>Items: {g.children?.length ?? 0}</span>
+          <div className="space-y-6">
+            {refunds.map((group) => {
+              const draft = getDraftForGroup(group);
+              const childrenSum = getDraftChildrenSum(group);
+              const remaining = getDraftRemaining(group);
+              const isSaving = Boolean(savingRefundIds[group.parent.id]);
+              const isHighlighted = highlightId === group.parent.id;
+
+              return (
+                <div
+                  key={group.parent.id}
+                  className={`border rounded-lg bg-gray-50 p-4 sm:p-6 transition-shadow ${
+                    isHighlighted ? 'ring-2 ring-blue-300 border-blue-400 shadow-md' : 'shadow-sm'
+                  }`}
+                >
+                  <div className="flex flex-col gap-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Parent Amount *</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min={0}
+                            value={draft.amount ?? 0}
+                            onChange={(e) => updateGroupDraft(group, { amount: Number(e.target.value) })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Bank Account *</label>
+                          <select
+                            value={draft.bank_account_id ?? ''}
+                            onChange={(e) => updateGroupDraft(group, { bank_account_id: Number(e.target.value) })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                          >
+                            <option value="">Select bank account</option>
+                            {bankAccounts.map((acc) => (
+                              <option key={acc.id} value={acc.id}>
+                                {acc.name} {acc.account_number ? `(${acc.account_number})` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Date *</label>
+                          <input
+                            type="date"
+                            value={draft.date || ''}
+                            onChange={(e) => updateGroupDraft(group, { date: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Transaction ID</label>
+                          <input
+                            type="text"
+                            value={draft.transaction_id || ''}
+                            onChange={(e) => updateGroupDraft(group, { transaction_id: e.target.value || undefined })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-gray-900"
+                          />
+                          <p className="mt-1 text-xs text-gray-500">Optional. Leave empty to auto-generate.</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                          <input
+                            type="text"
+                            value={draft.description || ''}
+                            onChange={(e) => updateGroupDraft(group, { description: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                          />
+                        </div>
+                        <div className="text-sm text-gray-600 space-y-1">
+                          <div className="flex gap-3 flex-wrap">
+                            <span className="font-semibold text-gray-900">Current children: {draft.children.length}</span>
+                            <span className="text-teal-700">Children sum: {childrenSum.toFixed(2)}</span>
+                            <span className="text-teal-700">Parent amount: {Number(draft.amount || 0).toFixed(2)}</span>
+                          </div>
+                          <div
+                            className={
+                              remaining === 0
+                                ? 'text-green-600 font-semibold'
+                                : remaining > 0
+                                ? 'text-orange-600 font-semibold'
+                                : 'text-red-600 font-semibold'
+                            }
+                          >
+                            {remaining === 0 ? 'Balanced' : remaining > 0 ? `Remaining ${remaining.toFixed(2)}` : `Over by ${Math.abs(remaining).toFixed(2)}`}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border rounded-md bg-white">
+                      <div className="flex items-center justify-between px-3 py-2 border-b bg-gray-100 rounded-t-md">
+                        <h3 className="text-sm font-semibold text-gray-900">Refund Items</h3>
+                        <button
+                          type="button"
+                          onClick={() => addDraftChild(group)}
+                          className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                        >
+                          + Add Item
+                        </button>
+                      </div>
+
+                      {draft.children.length === 0 ? (
+                        <div className="px-3 py-4 text-sm text-gray-500">No refund items yet.</div>
+                      ) : (
+                        <div className="divide-y">
+                          {draft.children.map((child, index) => (
+                            <div key={child.transaction_id || index} className="p-3 grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                              <div className="sm:col-span-3">
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Amount *</label>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min={0}
+                                  value={child.amount ?? 0}
+                                  onChange={(e) => updateDraftChild(group, index, { amount: Number(e.target.value) })}
+                                  className="w-full px-2 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                                />
+                              </div>
+                              <div className="sm:col-span-4">
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Category (Expense) *</label>
+                                <select
+                                  value={child.category_id || 0}
+                                  onChange={(e) => updateDraftChild(group, index, { category_id: Number(e.target.value) })}
+                                  className="w-full px-2 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                                >
+                                  <option value={0}>Select category</option>
+                                  {expenseCategories.map((cat) => (
+                                    <option key={cat.id} value={cat.id}>
+                                      {cat.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="sm:col-span-4">
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
+                                <input
+                                  type="text"
+                                  value={child.description || ''}
+                                  onChange={(e) => updateDraftChild(group, index, { description: e.target.value })}
+                                  className="w-full px-2 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                                />
+                                {child.transaction_id && (
+                                  <p className="mt-1 text-[11px] text-gray-500">Child transaction: {child.transaction_id}</p>
+                                )}
+                              </div>
+                              <div className="sm:col-span-1 flex justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() => removeDraftChild(group, index)}
+                                  className="px-2 py-2 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-2 justify-end">
+                      <button
+                        type="button"
+                        onClick={() => resetDraftForGroup(group)}
+                        className="px-3 py-2 text-sm border border-gray-300 rounded-md text-gray-700 hover:bg-white"
+                        disabled={isSaving}
+                      >
+                        Reset Changes
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSaveGroup(group)}
+                        className="px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-60"
+                        disabled={isSaving}
+                      >
+                        {isSaving ? 'Saving…' : 'Save Changes'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteGroup(group)}
+                        className="px-3 py-2 text-sm bg-red-600 text-white rounded-md hover:bg-red-700"
+                        disabled={isSaving}
+                      >
+                        Delete Refund
+                      </button>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => handleEdit(g)} className="px-3 py-1 text-sm border rounded hover:bg-white">Edit</button>
-                    <button onClick={() => handleDeleteGroup(g)} className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700">Delete</button>
-                  </div>
                 </div>
-                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                  {(g.children ?? []).map((c) => (
-                    <div key={c.id} className="bg-white border rounded p-3 text-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-gray-900">{c.category?.name || '-'}</span>
-                        <span className="text-teal-700 font-semibold">{c.amount}</span>
-                      </div>
-                      <div className="text-gray-600 flex justify-between mt-1">
-                        <span className="font-mono">{c.transaction_id || '-'}</span>
-                        <span>{new Date(c.date).toLocaleDateString()}</span>
-                      </div>
-                      {c.description && <div className="text-gray-700 mt-1">{c.description}</div>}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
