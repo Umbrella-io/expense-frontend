@@ -1312,7 +1312,7 @@ export default function Dashboard() {
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-600 font-mono">{tx.transaction_id || '-'}</td>
                   <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700">{new Date(tx.date).toLocaleDateString()}</td>
-                  <td className="px-3 py-2 text-sm text-gray-700 max-w-xs truncate">{tx.description || '-'}</td>
+                  <td className="px-3 py-2 text-sm text-gray-700 whitespace-normal break-words">{tx.description || '-'}</td>
                   
                   {/* Source Bank */}
                   <td className="px-3 py-2 text-sm text-gray-700">

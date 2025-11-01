@@ -63,7 +63,13 @@ export default function RefundsPage() {
         getBankAccounts(false),
       ]);
       setCategories(cats);
-      setRefunds(Array.isArray(list) ? list : []);
+      const normalizedRefunds = Array.isArray(list)
+        ? list.map((group) => ({
+            ...group,
+            children: Array.isArray(group.children) ? group.children : [],
+          }))
+        : [];
+      setRefunds(normalizedRefunds);
       setBankAccounts(Array.isArray(accounts) ? accounts.filter(a => a.is_active !== false) : []);
     } catch (e) {
       console.error(e);
@@ -96,7 +102,7 @@ export default function RefundsPage() {
           date: refundToEdit.parent.date?.split('T')[0],
         });
         setChildren(
-          refundToEdit.children.map((c) => ({
+          (refundToEdit.children ?? []).map((c) => ({
             transaction_id: c.transaction_id,
             amount: c.amount,
             category_id: c.category_id || 0,
@@ -182,7 +188,7 @@ export default function RefundsPage() {
       date: group.parent.date?.split('T')[0],
     });
     setChildren(
-      group.children.map((c) => ({
+      (group.children ?? []).map((c) => ({
         transaction_id: c.transaction_id,
         amount: c.amount,
         category_id: c.category_id || 0,
@@ -366,7 +372,7 @@ export default function RefundsPage() {
                       <span className="font-mono">{g.parent.transaction_id || '-'}</span>
                       <span>{new Date(g.parent.date).toLocaleDateString()}</span>
                       <span className="text-teal-700">Amount: {g.total_amount}</span>
-                      <span>Items: {g.children.length}</span>
+                      <span>Items: {g.children?.length ?? 0}</span>
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -375,7 +381,7 @@ export default function RefundsPage() {
                   </div>
                 </div>
                 <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                  {g.children.map((c) => (
+                  {(g.children ?? []).map((c) => (
                     <div key={c.id} className="bg-white border rounded p-3 text-sm">
                       <div className="flex items-center justify-between">
                         <span className="font-medium text-gray-900">{c.category?.name || '-'}</span>
