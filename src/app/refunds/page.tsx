@@ -291,9 +291,20 @@ export default function RefundsPage() {
 
     setSavingRefundIds((prev) => ({ ...prev, [group.parent.id]: true }));
     try {
-      await updateRefund(group.parent.id, payload);
+      const updatedGroup = await updateRefund(group.parent.id, payload);
+      const normalized: RefundGroupResponse = {
+        ...updatedGroup,
+        children: Array.isArray(updatedGroup.children) ? updatedGroup.children : [],
+      };
+      setRefunds((prev) => {
+        if (!prev) return [normalized];
+        return prev.map((existing) => (existing.parent.id === group.parent.id ? normalized : existing));
+      });
+      setRefundDrafts((prev) => ({
+        ...prev,
+        [group.parent.id]: getGroupDraft(normalized),
+      }));
       toast.success('Refund updated');
-      await loadAll();
     } catch (e) {
       console.error(e);
       toast.error('Failed to update refund');
