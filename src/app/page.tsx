@@ -25,6 +25,7 @@ export default function Dashboard() {
   const [convertingFromRefund, setConvertingFromRefund] = useState<number | null>(null);
   const [filterType, setFilterType] = useState<'all' | 'expense' | 'income' | 'investment' | 'transfer' | 'refund'>('all');
   const [filterBankId, setFilterBankId] = useState<number | 'all'>('all');
+  const [filterCategoryId, setFilterCategoryId] = useState<number | 'all'>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isDateFiltering, setIsDateFiltering] = useState(false);
@@ -41,6 +42,7 @@ export default function Dashboard() {
     transactions
       .filter(tx => !(tx.type === 'refund' && tx.parent_transaction_id != null))
       .filter(tx => filterBankId === 'all' ? true : tx.bank_account_id === filterBankId)
+      .filter(tx => filterCategoryId === 'all' ? true : tx.category_id === filterCategoryId)
       .slice()
       .sort((a, b) => {
         if (sortMode === 'amount_desc' || sortMode === 'amount_asc') {
@@ -62,8 +64,31 @@ export default function Dashboard() {
           return (b.id || 0) - (a.id || 0);
         }
       }),
-    [transactions, filterBankId, sortMode]
+    [transactions, filterBankId, filterCategoryId, sortMode]
   );
+
+  const categoryOptions = useMemo(() => {
+    const sorted = categories
+      .slice()
+      .sort((a, b) => {
+        if (a.type !== b.type) {
+          return a.type.localeCompare(b.type);
+        }
+        return a.name.localeCompare(b.name);
+      });
+
+    if (filterType === 'transfer' || filterType === 'refund') {
+      return [] as typeof categories;
+    }
+
+    if (filterType === 'all') {
+      return sorted;
+    }
+
+    return sorted.filter(cat => cat.type === filterType);
+  }, [categories, filterType]);
+
+  const isCategoryFilterDisabled = filterType === 'transfer' || filterType === 'refund' || categoryOptions.length === 0;
 
   const refundChildrenByParent = useMemo(() => {
     const map = new Map<number, Transaction[]>();
@@ -158,6 +183,7 @@ export default function Dashboard() {
         const saved = JSON.parse(raw) as {
           filterType?: 'all' | 'expense' | 'income' | 'investment' | 'transfer' | 'refund';
           filterBankId?: number | 'all';
+          filterCategoryId?: number | 'all';
           startDate?: string;
           endDate?: string;
           isDateFiltering?: boolean;
@@ -165,6 +191,7 @@ export default function Dashboard() {
         };
         if (saved.filterType) setFilterType(saved.filterType);
         if (saved.filterBankId !== undefined) setFilterBankId(saved.filterBankId);
+        if (saved.filterCategoryId !== undefined) setFilterCategoryId(saved.filterCategoryId);
         if (saved.startDate) setStartDate(saved.startDate);
         if (saved.endDate) setEndDate(saved.endDate);
         if (typeof saved.isDateFiltering === 'boolean') setIsDateFiltering(saved.isDateFiltering);
@@ -183,6 +210,7 @@ export default function Dashboard() {
     const payload = {
       filterType,
       filterBankId,
+      filterCategoryId,
       startDate,
       endDate,
       isDateFiltering,
@@ -200,6 +228,29 @@ export default function Dashboard() {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterType, isDateFiltering, startDate, endDate, filtersHydrated]);
+
+  useEffect(() => {
+    if (filterType === 'transfer' || filterType === 'refund') {
+      if (filterCategoryId !== 'all') {
+        setFilterCategoryId('all');
+      }
+      return;
+    }
+
+    if (filterCategoryId === 'all') {
+      return;
+    }
+
+    const category = categories.find(cat => cat.id === filterCategoryId);
+    if (!category) {
+      setFilterCategoryId('all');
+      return;
+    }
+
+    if (filterType !== 'all' && category.type !== filterType) {
+      setFilterCategoryId('all');
+    }
+  }, [categories, filterType, filterCategoryId]);
 
   useEffect(() => {
     fetchAggregateTable();
@@ -950,6 +1001,29 @@ export default function Dashboard() {
                 <option value="investment">Investment</option>
                 <option value="transfer">Transfer</option>
                 <option value="refund">Refund</option>
+              </select>
+            </div>
+
+            {/* Category Filter */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Category:</label>
+              <select
+                value={filterCategoryId === 'all' ? 'all' : String(filterCategoryId)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFilterCategoryId(val === 'all' ? 'all' : Number(val));
+                }}
+                disabled={isCategoryFilterDisabled}
+                className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1 md:flex-initial disabled:opacity-50"
+              >
+                <option value="all">All</option>
+                {categoryOptions.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {filterType === 'all'
+                      ? `[${category.type.charAt(0).toUpperCase()}${category.type.slice(1)}] ${category.name}`
+                      : category.name}
+                  </option>
+                ))}
               </select>
             </div>
 
