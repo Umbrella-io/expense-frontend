@@ -1,4 +1,4 @@
-import type { Transaction, Category, TransactionAggregate, CreateTransactionRequest, CreateCategoryRequest, UpdateTransactionRequest, UpdateCategoryRequest, BulkTransactionRequest, BulkTransactionResponse, BulkDeleteRequest, BulkDeleteResponse, AggregateTableResponse, DateRangeParams, HealthData, RefundCreateRequest, RefundUpdateRequest, RefundConvertRequest, RefundGroupResponse, BankAccount, BulkTransactionWithDefaultsRequest } from './types';
+import type { Transaction, Category, TransactionAggregate, CreateTransactionRequest, CreateCategoryRequest, UpdateTransactionRequest, UpdateCategoryRequest, BulkTransactionRequest, BulkTransactionResponse, BulkDeleteRequest, BulkDeleteResponse, AggregateTableResponse, DateRangeParams, HealthData, RefundCreateRequest, RefundUpdateRequest, RefundConvertRequest, RefundGroupResponse, BankAccount, BulkTransactionWithDefaultsRequest, LoginResponse, SignupResponse } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -9,11 +9,17 @@ if (typeof window !== 'undefined' && !API_BASE_URL) {
 }
 
 export async function apiGet<T>(endpoint: string): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  const token = sessionStorage.getItem('token');
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
   });
 
   if (!response.ok) {
@@ -24,11 +30,17 @@ export async function apiGet<T>(endpoint: string): Promise<T> {
 }
 
 export async function apiPost<T>(endpoint: string, data: unknown): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  const token = sessionStorage.getItem('token');
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify(data),
   });
 
@@ -43,11 +55,17 @@ export async function apiPost<T>(endpoint: string, data: unknown): Promise<T> {
 
 
 export async function apiPut<T>(endpoint: string, data: unknown): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  const token = sessionStorage.getItem('token');
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify(data),
   });
 
@@ -61,11 +79,17 @@ export async function apiPut<T>(endpoint: string, data: unknown): Promise<T> {
 }
 
 export async function apiPatch<T>(endpoint: string, data: unknown): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  const token = sessionStorage.getItem('token');
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify(data),
   });
 
@@ -79,11 +103,17 @@ export async function apiPatch<T>(endpoint: string, data: unknown): Promise<T> {
 }
 
 export async function apiDelete<T>(endpoint: string, data?: unknown): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  const token = sessionStorage.getItem('token');
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const requestOptions: RequestInit = {
     method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
   };
 
   if (data) {
@@ -126,20 +156,20 @@ export async function updateTransactionType(id: number, type: 'expense' | 'incom
 }
 
 export async function updateTransactionBankAccounts(
-  id: number, 
-  bankAccountId: number, 
+  id: number,
+  bankAccountId: number,
   destinationBankAccountId?: number | null
 ) {
   const payload: UpdateTransactionRequest = {
     bank_account_id: bankAccountId,
     destination_bank_account_id: destinationBankAccountId
   };
-  
+
   // If destination is provided and different from source, auto-change to transfer
   if (destinationBankAccountId && destinationBankAccountId !== bankAccountId) {
     payload.type = 'transfer';
   }
-  
+
   return apiPut<Transaction>(`/api/transactions/${id}`, payload);
 }
 
@@ -252,4 +282,12 @@ export async function updateBankAccount(id: number, data: Partial<Omit<BankAccou
 
 export async function deleteBankAccount(id: number) {
   return apiDelete<{ message: string }>(`/api/bank-accounts/${id}`);
+}
+
+export async function login(data: unknown) {
+  return apiPost<LoginResponse>('/api/auth/login', data);
+}
+
+export async function signup(data: unknown) {
+  return apiPost<SignupResponse>('/api/auth/signup', data);
 }

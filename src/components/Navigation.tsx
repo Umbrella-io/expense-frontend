@@ -4,11 +4,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWelcome } from '@/contexts/WelcomeContext';
 
 export default function Navigation() {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { logout } = useAuth();
+  const { resetWelcome } = useWelcome();
 
   const isActive = (path: string) => pathname === path;
 
@@ -50,6 +52,12 @@ export default function Navigation() {
                 {link.label}
               </Link>
             ))}
+            <button
+              onClick={resetWelcome}
+              className="px-3 py-2 rounded-md text-sm font-medium text-purple-600 hover:text-purple-700 hover:bg-purple-50 transition-colors"
+            >
+              Welcome
+            </button>
             <button
               onClick={logout}
               className="px-3 py-2 rounded-md text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors"
@@ -99,6 +107,12 @@ export default function Navigation() {
                 </Link>
               ))}
               <div className="border-t border-gray-200 my-2" />
+              <button
+                onClick={() => { resetWelcome(); closeMenu(); }}
+                className="w-full text-left block px-3 py-2 rounded-md text-base font-medium text-purple-600 hover:text-purple-700 hover:bg-purple-50 transition-colors"
+              >
+                Welcome
+              </button>
               <button
                 onClick={() => { logout(); closeMenu(); }}
                 className="w-full text-left block px-3 py-2 rounded-md text-base font-medium text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors"
