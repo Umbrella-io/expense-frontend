@@ -291,3 +291,7 @@ export async function login(data: unknown) {
 export async function signup(data: unknown) {
   return apiPost<SignupResponse>('/api/auth/signup', data);
 }
+
+export async function changePassword(data: unknown) {
+  return apiPost<{ message: string }>('/api/auth/change-password', data);
+}

@@ -32,16 +32,19 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSwitchToLogin }) => {
 
         setIsLoading(true);
 
-        const success = await signup(username, password);
-
-        if (success) {
-            toast.success('Account created successfully!');
-        } else {
-            toast.error('Signup failed. Username might be taken.');
-            setPassword('');
+        try {
+            const success = await signup(username, password);
+            if (success) {
+                toast.success('Account created successfully!');
+            } else {
+                // Error is already handled in AuthContext but we can add specific UI feedback here if needed
+                // The toast in AuthContext will show "Signups are currently disabled" if 403 is returned
+            }
+        } catch (error) {
+            console.error('Signup failed:', error);
+        } finally {
+            setIsLoading(false);
         }
-
-        setIsLoading(false);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { login as apiLogin, signup as apiSignup } from '@/lib/api';
+import { toast } from 'react-hot-toast';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -55,8 +56,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return true;
       }
       return false;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Signup failed:', error);
+      // Check if it's a 403 Forbidden (signups disabled)
+      if (error.message && error.message.includes('403')) {
+        toast.error("We're not accepting new users currently. Please try again later.");
+      } else {
+        toast.error('Signup failed. Please try again.');
+      }
       return false;
     }
   };
