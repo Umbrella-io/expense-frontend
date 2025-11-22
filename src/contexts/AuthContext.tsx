@@ -56,10 +56,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return true;
       }
       return false;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Signup failed:', error);
       // Check if it's a 403 Forbidden (signups disabled)
-      if (error.message && error.message.includes('403')) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('403')) {
         toast.error("We're not accepting new users currently. Please try again later.");
       } else {
         toast.error('Signup failed. Please try again.');
