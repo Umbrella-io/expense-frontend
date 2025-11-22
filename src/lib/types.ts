@@ -226,3 +226,16 @@ export interface RefundGroupResponse {
   total_amount: number;
   children_sum: number;
 }
+
+export interface LoginResponse {
+  token: string;
+}
+
+export interface SignupResponse {
+  token: string;
+  user: {
+    id: number;
+    username: string;
+    created_at: string;
+  };
+}

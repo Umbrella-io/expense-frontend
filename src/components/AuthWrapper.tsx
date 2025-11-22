@@ -1,9 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import PasswordPage from './PasswordPage';
+import { useWelcome } from '@/contexts/WelcomeContext';
+import LoginPage from './LoginPage';
+import SignupPage from './SignupPage';
 import Navigation from './Navigation';
+import WelcomeScreen from './WelcomeScreen';
 
 interface AuthWrapperProps {
   children: React.ReactNode;
@@ -11,9 +14,19 @@ interface AuthWrapperProps {
 
 const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
   const { isAuthenticated } = useAuth();
+  const { showWelcome, dismissWelcome } = useWelcome();
+  const [isLogin, setIsLogin] = useState(true);
 
   if (!isAuthenticated) {
-    return <PasswordPage />;
+    return isLogin ? (
+      <LoginPage onSwitchToSignup={() => setIsLogin(false)} />
+    ) : (
+      <SignupPage onSwitchToLogin={() => setIsLogin(true)} />
+    );
+  }
+
+  if (showWelcome) {
+    return <WelcomeScreen onGetStarted={dismissWelcome} />;
   }
 
   return (

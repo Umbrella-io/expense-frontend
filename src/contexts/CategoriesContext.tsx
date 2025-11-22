@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { getCategories } from '@/lib/api';
 import type { Category } from '@/lib/types';
+import { useAuth } from './AuthContext';
 
 interface CategoriesContextType {
   categories: Category[];
@@ -17,8 +18,15 @@ const CategoriesContext = createContext<CategoriesContextType | undefined>(undef
 export function CategoriesProvider({ children }: { children: ReactNode }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const { isAuthenticated } = useAuth();
 
   const fetchCategories = async () => {
+    if (!isAuthenticated) {
+      setCategories([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const data = await getCategories();
@@ -33,7 +41,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     fetchCategories();
-  }, []);
+  }, [isAuthenticated]);
 
   const refreshCategories = async () => {
     await fetchCategories();

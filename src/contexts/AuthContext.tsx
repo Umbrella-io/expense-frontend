@@ -1,10 +1,12 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { login as apiLogin, signup as apiSignup } from '@/lib/api';
 
 interface AuthContextType {
   isAuthenticated: boolean;
-  login: (password: string) => boolean;
+  login: (username: string, password: string) => Promise<boolean>;
+  signup: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
 }
 
@@ -23,30 +25,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     // Check if user is already authenticated (stored in sessionStorage)
-    const authStatus = sessionStorage.getItem('isAuthenticated');
-    if (authStatus === 'true') {
+    const token = sessionStorage.getItem('token');
+    if (token) {
       setIsAuthenticated(true);
     }
   }, []);
 
-  const login = (password: string): boolean => {
-    const correctPassword = process.env.NEXT_PUBLIC_APP_PASSWORD;
-    
-    if (password === correctPassword) {
-      setIsAuthenticated(true);
-      sessionStorage.setItem('isAuthenticated', 'true');
-      return true;
+  const login = async (username: string, password: string): Promise<boolean> => {
+    try {
+      const response = await apiLogin({ username, password });
+      if (response.token) {
+        sessionStorage.setItem('token', response.token);
+        setIsAuthenticated(true);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Login failed:', error);
+      return false;
     }
-    return false;
+  };
+
+  const signup = async (username: string, password: string): Promise<boolean> => {
+    try {
+      const response = await apiSignup({ username, password });
+      if (response.token) {
+        sessionStorage.setItem('token', response.token);
+        setIsAuthenticated(true);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Signup failed:', error);
+      return false;
+    }
   };
 
   const logout = () => {
     setIsAuthenticated(false);
-    sessionStorage.removeItem('isAuthenticated');
+    sessionStorage.removeItem('token');
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, login, signup, logout }}>
       {children}
     </AuthContext.Provider>
   );
