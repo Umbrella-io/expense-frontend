@@ -74,7 +74,7 @@ export default function RefundsPage() {
   }
 
   const expenseCategories = useMemo(
-    () => categories.filter((c) => c.type === 'expense'),
+    () => (categories || []).filter((c) => c.type === 'expense'),
     [categories]
   );
 
@@ -96,9 +96,9 @@ export default function RefundsPage() {
       setCategories(cats);
       const normalizedRefunds = Array.isArray(list)
         ? list.map((group) => ({
-            ...group,
-            children: Array.isArray(group.children) ? group.children : [],
-          }))
+          ...group,
+          children: Array.isArray(group.children) ? group.children : [],
+        }))
         : [];
       setRefunds(normalizedRefunds);
       setBankAccounts(Array.isArray(accounts) ? accounts.filter(a => a.is_active !== false) : []);
@@ -475,9 +475,8 @@ export default function RefundsPage() {
               return (
                 <div
                   key={group.parent.id}
-                  className={`border rounded-lg bg-gray-50 p-4 sm:p-6 transition-shadow ${
-                    isHighlighted ? 'ring-2 ring-blue-300 border-blue-400 shadow-md' : 'shadow-sm'
-                  }`}
+                  className={`border rounded-lg bg-gray-50 p-4 sm:p-6 transition-shadow ${isHighlighted ? 'ring-2 ring-blue-300 border-blue-400 shadow-md' : 'shadow-sm'
+                    }`}
                 >
                   <div className="flex flex-col gap-4">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -549,8 +548,8 @@ export default function RefundsPage() {
                               remaining === 0
                                 ? 'text-green-600 font-semibold'
                                 : remaining > 0
-                                ? 'text-orange-600 font-semibold'
-                                : 'text-red-600 font-semibold'
+                                  ? 'text-orange-600 font-semibold'
+                                  : 'text-red-600 font-semibold'
                             }
                           >
                             {remaining === 0 ? 'Balanced' : remaining > 0 ? `Remaining ${remaining.toFixed(2)}` : `Over by ${Math.abs(remaining).toFixed(2)}`}

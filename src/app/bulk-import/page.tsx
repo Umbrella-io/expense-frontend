@@ -34,9 +34,9 @@ export default function BulkImportPage() {
     formState: { errors },
   } = useForm<FormValues>();
 
-  const expenseCategories = categories.filter((c) => c.type === "expense");
-  const incomeCategories = categories.filter((c) => c.type === "income");
-  const investmentCategories = categories.filter((c) => c.type === "investment");
+  const expenseCategories = (categories || []).filter((c) => c.type === "expense");
+  const incomeCategories = (categories || []).filter((c) => c.type === "income");
+  const investmentCategories = (categories || []).filter((c) => c.type === "investment");
 
   useEffect(() => {
     const loadData = async () => {
@@ -61,11 +61,11 @@ export default function BulkImportPage() {
   const onSubmit = async (form: FormValues) => {
     setSubmitting(true);
     setResults(null);
-    
+
     try {
       // Parse JSON
       const parsedJson = JSON.parse(form.json_input);
-      
+
       // Validate structure
       if (!parsedJson.transactions || !Array.isArray(parsedJson.transactions)) {
         toast.error('JSON must have a "transactions" array');
@@ -84,7 +84,7 @@ export default function BulkImportPage() {
 
       const response = await createBulkTransactionsWithDefaults(payload);
       setResults(response);
-      
+
       if (response.failed_count === 0) {
         toast.success(`Successfully imported ${response.success_count} transactions!`);
       } else if (response.success_count === 0) {
@@ -141,7 +141,7 @@ export default function BulkImportPage() {
               </select>
               {errors.bank_account_id && <p className="mt-1 text-sm text-red-600">{errors.bank_account_id.message as string}</p>}
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Default Expense Category</label>
               <select
@@ -224,7 +224,7 @@ export default function BulkImportPage() {
       {results && (
         <div className="bg-white p-6 rounded-lg shadow-sm border">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Import Results</h2>
-          
+
           <div className="grid grid-cols-3 gap-4 mb-6">
             <div className="bg-gray-50 p-4 rounded-lg">
               <div className="text-sm text-gray-600">Total</div>

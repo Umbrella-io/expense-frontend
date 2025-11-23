@@ -50,9 +50,9 @@ export default function Categories() {
     }
   };
 
-  const expenseCategories = categories.filter(cat => cat.type === 'expense');
-  const incomeCategories = categories.filter(cat => cat.type === 'income');
-  const investmentCategories = categories.filter(cat => cat.type === 'investment');
+  const expenseCategories = (categories || []).filter(cat => cat.type === 'expense');
+  const incomeCategories = (categories || []).filter(cat => cat.type === 'income');
+  const investmentCategories = (categories || []).filter(cat => cat.type === 'investment');
 
   if (categoriesLoading) {
     return (
@@ -80,13 +80,12 @@ export default function Categories() {
             <input
               type="text"
               id="name"
-              {...register('name', { 
+              {...register('name', {
                 required: 'Category name is required',
                 minLength: { value: 2, message: 'Name must be at least 2 characters' }
               })}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 ${
-                errors.name ? 'border-red-500' : 'border-gray-300'
-              }`}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 ${errors.name ? 'border-red-500' : 'border-gray-300'
+                }`}
               placeholder="e.g., Groceries"
             />
             {errors.name && (
@@ -101,9 +100,8 @@ export default function Categories() {
             <select
               id="type"
               {...register('type', { required: 'Type is required' })}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 ${
-                errors.type ? 'border-red-500' : 'border-gray-300'
-              }`}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 ${errors.type ? 'border-red-500' : 'border-gray-300'
+                }`}
             >
               <option value="">Select type</option>
               <option value="expense">Expense</option>
