@@ -2,6 +2,8 @@
 
 A modern Next.js 14 frontend application for tracking personal income and expenses. Built with TypeScript, TailwindCSS, and modern React patterns.
 
+A demo video:- https://drive.google.com/file/d/1O-ekLYln_8I_HaTwdFM-zZwW9MdYQB2l/view?usp=drive_link
+
 ## Features
 
 - 📊 **Dashboard **: Visual overview with pie charts showing expense and income breakdown by category
